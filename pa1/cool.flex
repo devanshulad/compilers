@@ -47,6 +47,7 @@ extern YYSTYPE cool_yylval;
  */
 
 DARROW =>
+DIGIT [0-9]
 
 %%
 
@@ -60,12 +61,46 @@ DARROW =>
   */
 {DARROW}		{ return (DARROW); }
 
+ /* Integers. */
+{DIGIT}+  { 
+  cool_yylval.symbol = inttable.add_string(yytext);
+  return INT_CONST; /* INT_CONST */
+}
+ 
+ 
  /*
   * Keywords are case-insensitive except for the values true and false,
   * which must begin with a lower-case letter.
+  * Keyword Done List: Class, else, if, fi, in, inherits, isvoid, let,
+  * loop, pool, new, of, not, then, while, case
   */
+(?i:class)   { return (CLASS); }
+(?i:else)    { return (ELSE); }
+(?i:if)      { return (IF); }  
+(?i:fi)      { return (FI); }  
+(?i:in)      { return (IN); }  
+(?i:inherits)      { return (INHERITS); }  
+(?i:isvoid)      { return (ISVOID); }  
+(?i:let)      { return (LET); }  
+(?i:loop)      { return (LOOP); }  
+(?i:pool)      { return (POOL); }  
+(?i:then)      { return (THEN); }  
+(?i:while)      { return (WHILE); }  
+(?i:case)      { return (CASE); }  
+(?i:esac)      { return (ESAC); }  
+(?i:new)      { return (NEW); }  
+(?i:of)      { return (OF); }  
+(?i:not)      { return (NOT); }  
 
-
+t(?i:rue)     { 
+  cool_yylval.boolean = true;
+  return (BOOL_CONST); 
+}
+f(?i:alse)    { 
+  cool_yylval.boolean = false; 
+  return (BOOL_CONST); 
+}
+  /* Need to do true and false. */
  /*
   *  String constants (C syntax, taken from lexdoc(1) )
   *  Escape sequence \c is accepted for all characters c. Except for
@@ -74,5 +109,7 @@ DARROW =>
   *
   */
 
+[\n]    { curr_lineno++; }
 
 %%
+
