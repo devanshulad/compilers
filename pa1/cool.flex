@@ -48,24 +48,29 @@ extern YYSTYPE cool_yylval;
 
 DARROW =>
 DIGIT [0-9]
+ /*IDENTIFIER_REST [a-zA-Z0-9_]* */
+OBJID [a-z][a-zA-Z0-9_]*
+ /* TYID  [A-Z][a-zA-Z0-9_]* */
 
 %%
+
+ /*
+  * Normal comments
+  */
+ /* '--'.* */
 
  /*
   *  Nested comments
   */
 
-
- /*
-  *  The multiple-character operators.
+ /* 
+  * Object Identifiers.
   */
-{DARROW}		{ return (DARROW); }
+ /*{OBJID} { 
+  cool_yylval.symbol = idtable.add_string(yytext);
+  return (OBJECTID);
+ */
 
- /* Integers. */
-{DIGIT}+  { 
-  cool_yylval.symbol = inttable.add_string(yytext);
-  return INT_CONST; /* INT_CONST */
-}
  
  
  /*
@@ -108,8 +113,61 @@ f(?i:alse)    {
   *  (but note that 'c' can't be the NUL character)
   *
   */
+[a-z][A-Za-z0-9_]* {
+    cool_yylval.symbol = idtable.add_string(yytext);
+    return OBJECTID;
+}
+
+
+ /*
+  * Type Identifiers.
+  */
+[A-Z][A-Za-z0-9_]* {
+    cool_yylval.symbol = idtable.add_string(yytext);
+    return TYPEID;
+}
+
+ /*
+  *  The multiple-character operators.
+  */
+{DARROW}		{ return (DARROW); }
+
+"<="        { return (LE); }
+
+"<-"        { return (ASSIGN); }
+ /* Integers. */
+{DIGIT}+  { 
+  cool_yylval.symbol = inttable.add_string(yytext);
+  return (INT_CONST); /* INT_CONST */
+}
 
 [\n]    { curr_lineno++; }
 
+" "          |
+[\f\r\t\v]   {}
+
+  /* ( ) ~ < ; , [ ] { } <- @ . : + - * / = (<= is le and <- is assi)*/
+"("     |
+")"     |
+"~"     |
+"<"     |
+"="     |
+":"     |
+";"     |
+","     |
+"/"     |
+"."     |
+"{"     |
+"}"     |
+"@"     |
+"/"     |
+"*"     |
+"+"     |
+"-"     { return (int (*yytext)); }
+
+[^\n]   {
+  cool_yylval.error_msg = yytext;
+  return ERROR;
+}
 %%
 

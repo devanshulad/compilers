@@ -1,17 +1,17 @@
-if
-then
-Else
+if  then
+Else    asd
 tRUE
-fAlSethen
+    fAlSethen
 TRUE
+)) ( 
 
 
 =>
-->
-tRUE
+<-
+    tRUE
 Falsse
-1829511
+1829511 ( 
 1c1ga841dg
-4-4-4-4-4
+4-4-4
 
-1c4 /* Double check this case. */
+1c4
