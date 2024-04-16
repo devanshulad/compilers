@@ -33,6 +33,7 @@ char *string_buf_ptr;
 
 extern int curr_lineno;
 extern int verbose_flag;
+static int num_comm_open = 0;
 
 extern YYSTYPE cool_yylval;
 
@@ -51,8 +52,45 @@ DIGIT [0-9]
  /*IDENTIFIER_REST [a-zA-Z0-9_]* */
 OBJID [a-z][a-zA-Z0-9_]*
  /* TYID  [A-Z][a-zA-Z0-9_]* */
+%x COMMENT
+%x INLINE_COMMENT
 
 %%
+
+"--" {BEGIN (INLINE_COMMENT);}
+<INLINE_COMMENT>[\n] {
+  curr_lineno ++;
+  BEGIN 0;
+  }
+<INLINE_COMMENT><<EOF>> {BEGIN 0;}
+<INLINE_COMMENT>. {}
+
+"(*" {
+  BEGIN(COMMENT);
+  num_comm_open ++;
+}
+<COMMENT>[\n] {curr_lineno ++;}
+<COMMENT>"*)" {
+  num_comm_open --;
+  if (num_comm_open == 0) {
+    BEGIN 0;
+  }
+}
+<COMMENT>"(*" {
+  num_comm_open ++;
+}
+<COMMENT><<EOF>> {
+    cool_yylval.error_msg = "EOF in comment";
+    BEGIN 0;
+    return ERROR;
+}
+<COMMENT>. {} 
+
+"*)" {
+  cool_yylval.error_msg = "Unmatched *)";
+  BEGIN 0;
+  return ERROR;
+}
 
  /*
   * Normal comments
