@@ -54,8 +54,55 @@ OBJID [a-z][a-zA-Z0-9_]*
  /* TYID  [A-Z][a-zA-Z0-9_]* */
 %x COMMENT
 %x INLINE_COMMENT
+%x STRING
 
 %%
+
+<STRING><<EOF>> {
+  cool_yylval.error_msg = "EOF in string constant";
+  BEGIN 0;
+  return ERROR;
+}
+ /*
+<STRING>\\n {
+  cool_yylval.error_msg = "Unmatched new line in string constant";
+  BEGIN 0;
+  return ERROR;
+}
+ */
+
+<STRING>"\"" {
+  /* strcpy(string_buf_ptr, "\0"); */
+  cool_yylval.symbol = stringtable.add_string(string_buf);
+  string_buf_ptr = string_buf;
+  BEGIN 0;
+  return STR_CONST;
+}
+
+"\"" { 
+  BEGIN (STRING); 
+  string_buf_ptr = string_buf;
+}
+
+<STRING>\[^nbtf.]
+
+<STRING>[^"\""<<EOF>>"\n"] { 
+  strcpy(string_buf_ptr, yytext); 
+  *string_buf_ptr++; 
+}
+ /*
+<STRING>[^"\""<<EOF>>]* {
+  int len_string = strlen(yytext);
+  strcpy(string_buf_ptr, yytext);
+  *string_buf_ptr += len_string;
+}
+ */
+ /*
+  * "\""([^"\""]*)"\"" {
+  *  cool_yylval.symbol = stringtable.add_string(yytext);
+  *  return STR_CONST;
+  * }
+  */
 
 "--" {BEGIN (INLINE_COMMENT);}
 <INLINE_COMMENT>[\n] {
@@ -168,7 +215,7 @@ f(?i:alse)    {
  /*
   *  The multiple-character operators.
   */
-{DARROW}		{ return (DARROW); }
+{DARROW}    { return (DARROW); }
 
 "<="        { return (LE); }
 
@@ -208,4 +255,5 @@ f(?i:alse)    {
   return ERROR;
 }
 %%
+
 
