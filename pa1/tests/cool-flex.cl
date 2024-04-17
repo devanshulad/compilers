@@ -38,15 +38,15 @@ static bool is_maxed = false; /* keeps track if string is longer than max */
 
 extern YYSTYPE cool_yylval;
 
-void test_max_string ();   /* to check if string is longer than max */
+void test_max_string ();   /* to chec if string is longer than max */
 
 %}
 
 DARROW =>
 DIGIT [0-9]
-%x COMMENT         
-%x INLINE_COMMENT  
-%x STRING         
+%x COMMENT         /* (* comment begin state */
+%x INLINE_COMMENT  /* inline comment begin state */
+%x STRING          /* string begin state */
 
 %%
 
