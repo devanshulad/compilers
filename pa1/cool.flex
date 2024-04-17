@@ -61,6 +61,7 @@ OBJID [a-z][a-zA-Z0-9_]*
 <STRING><<EOF>> {
   cool_yylval.error_msg = "EOF in string constant";
   BEGIN 0;
+  string_buf_ptr = string_buf;
   return ERROR;
 }
  /*
@@ -72,6 +73,7 @@ OBJID [a-z][a-zA-Z0-9_]*
  */
 "\"" { 
   BEGIN (STRING); 
+  /* printf ("i am a string \n"); */
   string_buf_ptr = string_buf;
 }
 
@@ -79,12 +81,35 @@ OBJID [a-z][a-zA-Z0-9_]*
   /* strcpy(string_buf_ptr, "\0"); 
   
    do we need to add \0 here ?*/
+  *string_buf_ptr = '\0';
   cool_yylval.symbol = stringtable.add_string(string_buf);
   string_buf_ptr = string_buf;
   BEGIN 0;
+   /*printf ("done with string \n"); */
   return STR_CONST;
 }
 
+ /*
+<STRING>'\n' {
+  printf("REACHED new line compiler");
+}
+ */
+
+
+<STRING>\\\n {
+  /*printf("now text is %s", yytext);*/ 
+  /* printf("in instance 1 with %s", yytext); */
+  *string_buf_ptr++ = '\n';
+  curr_lineno++;
+}
+
+<STRING>\n {
+  cool_yylval.error_msg = "Unterminated string constant";
+  curr_lineno++;
+  string_buf_ptr = string_buf;
+  BEGIN 0;
+  return ERROR;
+}
  /* need to check string length max in all of these maybe we can have a 
   helper fun or switch ? lowkey we can also just redo the same code block if 
   they dont grade for style. */
@@ -98,28 +123,37 @@ OBJID [a-z][a-zA-Z0-9_]*
 }
 
 <STRING>"\\n" {
+   /*printf("in instance 2 with %s", yytext); */
   *string_buf_ptr++ = '\n';
 }
+
 
 <STRING>"\\t" {
   *string_buf_ptr++ = '\t';
 }
 
-<STRING>\\[^bfnt] { /* do we need \0 here ? */
-  *string_buf_ptr++ = yytext[1];
+<STRING>\\[^b^f^n^t] { /* do we need \0 here ? */
+   /*printf("reached line 127 which is %s", yytext); */
+  if (strlen(yytext) > 1) {
+    /*printf("reached line 127 which is %s, %zu", yytext, strlen(yytext)); */
+    *string_buf_ptr++ = yytext[1];
+  }
+  /* curr_lineno++; */
 }
 
-<STRING>"\\\0" {  /* I dont know how to make a test for this */
+ /* Should this be \\0 instead of \\\0 */
+<STRING>"\0" {  /* I dont know how to make a test for this */
   cool_yylval.error_msg = "String contains null character";
+  string_buf_ptr = string_buf;
   BEGIN 0;
   return ERROR;
 }
 
-
-<STRING>[^"\""<<EOF>>"\n"] { 
+<STRING>. { 
   strcpy(string_buf_ptr, yytext); 
   *string_buf_ptr++; 
-}
+} 
+
  /*
 <STRING>[^"\""<<EOF>>]* {
   int len_string = strlen(yytext);
