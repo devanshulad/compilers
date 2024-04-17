@@ -29,35 +29,25 @@ extern FILE *fin; /* we read from this file */
 		YY_FATAL_ERROR( "read() in flex scanner failed");
 
 char string_buf[MAX_STR_CONST]; /* to assemble string constants */
-char *string_buf_ptr;
+char *string_buf_ptr; /* A pointer to the last char in the current string */
 
 extern int curr_lineno;
 extern int verbose_flag;
-static int num_comm_open = 0;
+static int num_comm_open = 0; /* keeps track of number of nested comment */
 
 extern YYSTYPE cool_yylval;
 
-/*
- *  Add Your own definitions here
- */
-
 %}
-
-/*
- * Define names for regular expressions here.
- */
 
 DARROW =>
 DIGIT [0-9]
- /*IDENTIFIER_REST [a-zA-Z0-9_]* */
-OBJID [a-z][a-zA-Z0-9_]*
- /* TYID  [A-Z][a-zA-Z0-9_]* */
 %x COMMENT
 %x INLINE_COMMENT
 %x STRING
 
 %%
 
+ /* String constant */
 <STRING><<EOF>> {
   cool_yylval.error_msg = "EOF in string constant";
   BEGIN 0;
@@ -154,20 +144,7 @@ OBJID [a-z][a-zA-Z0-9_]*
   *string_buf_ptr++; 
 } 
 
- /*
-<STRING>[^"\""<<EOF>>]* {
-  int len_string = strlen(yytext);
-  strcpy(string_buf_ptr, yytext);
-  *string_buf_ptr += len_string;
-}
- */
- /*
-  * "\""([^"\""]*)"\"" {
-  *  cool_yylval.symbol = stringtable.add_string(yytext);
-  *  return STR_CONST;
-  * }
-  */
-
+ /* Normal Comments */
 "--" {BEGIN (INLINE_COMMENT);}
 <INLINE_COMMENT>[\n] {
   curr_lineno ++;
@@ -176,6 +153,7 @@ OBJID [a-z][a-zA-Z0-9_]*
 <INLINE_COMMENT><<EOF>> {BEGIN 0;}
 <INLINE_COMMENT>. {}
 
+ /* Nested Comments */
 "(*" {
   BEGIN(COMMENT);
   num_comm_open ++;
@@ -202,32 +180,8 @@ OBJID [a-z][a-zA-Z0-9_]*
   BEGIN 0;
   return ERROR;
 }
-
- /*
-  * Normal comments
-  */
- /* '--'.* */
-
- /*
-  *  Nested comments
-  */
-
- /* 
-  * Object Identifiers.
-  */
- /*{OBJID} { 
-  cool_yylval.symbol = idtable.add_string(yytext);
-  return (OBJECTID);
- */
-
  
- 
- /*
-  * Keywords are case-insensitive except for the values true and false,
-  * which must begin with a lower-case letter.
-  * Keyword Done List: Class, else, if, fi, in, inherits, isvoid, let,
-  * loop, pool, new, of, not, then, while, case
-  */
+ /* Tokens for key words */
 (?i:class)   { return (CLASS); }
 (?i:else)    { return (ELSE); }
 (?i:if)      { return (IF); }  
@@ -246,6 +200,7 @@ OBJID [a-z][a-zA-Z0-9_]*
 (?i:of)      { return (OF); }  
 (?i:not)      { return (NOT); }  
 
+ /* Boolen operators */
 t(?i:rue)     { 
   cool_yylval.boolean = true;
   return (BOOL_CONST); 
@@ -254,48 +209,39 @@ f(?i:alse)    {
   cool_yylval.boolean = false; 
   return (BOOL_CONST); 
 }
-  /* Need to do true and false. */
- /*
-  *  String constants (C syntax, taken from lexdoc(1) )
-  *  Escape sequence \c is accepted for all characters c. Except for
-  *  \n \t \b \f, the result is c.
-  *  (but note that 'c' can't be the NUL character)
-  *
-  */
+
+  /* Type Identifiers. */
 [a-z][A-Za-z0-9_]* {
     cool_yylval.symbol = idtable.add_string(yytext);
     return OBJECTID;
 }
 
-
- /*
-  * Type Identifiers.
-  */
 [A-Z][A-Za-z0-9_]* {
     cool_yylval.symbol = idtable.add_string(yytext);
     return TYPEID;
 }
 
- /*
-  *  The multiple-character operators.
-  */
+ /* The multiple-character operators. */
 {DARROW}    { return (DARROW); }
 
 "<="        { return (LE); }
 
 "<-"        { return (ASSIGN); }
+
  /* Integers. */
 {DIGIT}+  { 
   cool_yylval.symbol = inttable.add_string(yytext);
-  return (INT_CONST); /* INT_CONST */
+  return (INT_CONST); 
 }
 
+ /* Increment the line number for every new line */
 [\n]    { curr_lineno++; }
 
+ /* Escape tokens */
 " "          |
 [\f\r\t\v]   {}
 
-  /* ( ) ~ < ; , [ ] { } <- @ . : + - * / = (<= is le and <- is assi)*/
+ /* Special single char tokens */
 "("     |
 ")"     |
 "~"     |
@@ -314,6 +260,7 @@ f(?i:alse)    {
 "+"     |
 "-"     { return (int (*yytext)); }
 
+ /* Catch can for all the errors */
 [^\n]   {
   cool_yylval.error_msg = yytext;
   return ERROR;
