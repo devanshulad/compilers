@@ -34,8 +34,11 @@ char *string_buf_ptr; /* A pointer to the last char in the current string */
 extern int curr_lineno;
 extern int verbose_flag;
 static int num_comm_open = 0; /* keeps track of number of nested comment */
+static bool is_maxed = false;
 
 extern YYSTYPE cool_yylval;
+
+bool test_max_string ();
 
 %}
 
@@ -63,6 +66,7 @@ DIGIT [0-9]
  */
 "\"" { 
   BEGIN (STRING); 
+  is_maxed = false;
   /* printf ("i am a string \n"); */
   string_buf_ptr = string_buf;
 }
@@ -71,12 +75,22 @@ DIGIT [0-9]
   /* strcpy(string_buf_ptr, "\0"); 
   
    do we need to add \0 here ?*/
-  *string_buf_ptr = '\0';
-  cool_yylval.symbol = stringtable.add_string(string_buf);
-  string_buf_ptr = string_buf;
-  BEGIN 0;
-   /*printf ("done with string \n"); */
-  return STR_CONST;
+  if (is_maxed) {
+    is_maxed = false;
+    BEGIN 0;
+    string_buf_ptr = string_buf; 
+    return STR_CONST;
+  } else {
+    if (test_max_string())
+      return ERROR;
+
+    *string_buf_ptr = '\0';
+    cool_yylval.symbol = stringtable.add_string(string_buf);
+    string_buf_ptr = string_buf;
+    BEGIN 0;
+    /*printf ("done with string \n"); */
+    return STR_CONST;
+  }
 }
 
  /*
@@ -87,6 +101,8 @@ DIGIT [0-9]
 
 
 <STRING>\\\n {
+  if (test_max_string())
+    return ERROR;
   /*printf("now text is %s", yytext);*/ 
   /* printf("in instance 1 with %s", yytext); */
   *string_buf_ptr++ = '\n';
@@ -94,6 +110,8 @@ DIGIT [0-9]
 }
 
 <STRING>\n {
+  /*   if (test_max_string())
+    return ERROR; */
   cool_yylval.error_msg = "Unterminated string constant";
   curr_lineno++;
   string_buf_ptr = string_buf;
@@ -105,29 +123,39 @@ DIGIT [0-9]
   they dont grade for style. */
 
 <STRING>"\\b" {
+  if (test_max_string())
+    return ERROR;
   *string_buf_ptr++ = '\b';
 }
 
 <STRING>"\\f" {
+  if (test_max_string())
+    return ERROR;
   *string_buf_ptr++ = '\f';
 }
 
 <STRING>"\\n" {
    /*printf("in instance 2 with %s", yytext); */
+  if (test_max_string())
+    return ERROR;
   *string_buf_ptr++ = '\n';
 }
 
 
 <STRING>"\\t" {
+  if (test_max_string())
+    return ERROR;
   *string_buf_ptr++ = '\t';
 }
 
 <STRING>\\[^b^f^n^t] { /* do we need \0 here ? */
    /*printf("reached line 127 which is %s", yytext); */
-  if (strlen(yytext) > 1) {
+   /*if (strlen(yytext) > 1) { */
     /*printf("reached line 127 which is %s, %zu", yytext, strlen(yytext)); */
-    *string_buf_ptr++ = yytext[1];
-  }
+  if (test_max_string())
+    return ERROR;
+  *string_buf_ptr++ = yytext[1];
+  /* } */
   /* curr_lineno++; */
 }
 
@@ -140,6 +168,8 @@ DIGIT [0-9]
 }
 
 <STRING>. { 
+  if (test_max_string())
+    return ERROR;
   strcpy(string_buf_ptr, yytext); 
   *string_buf_ptr++; 
 } 
@@ -266,5 +296,16 @@ f(?i:alse)    {
   return ERROR;
 }
 %%
+
+bool test_max_string () {
+  if (string_buf_ptr >= string_buf + MAX_STR_CONST) {
+    cool_yylval.error_msg = "String constant too long";
+    string_buf_ptr = string_buf;
+    BEGIN (STRING);
+    is_maxed = true;
+    return true;
+  }
+  return false;
+}
 
 
