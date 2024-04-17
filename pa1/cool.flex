@@ -70,21 +70,51 @@ OBJID [a-z][a-zA-Z0-9_]*
   return ERROR;
 }
  */
+"\"" { 
+  BEGIN (STRING); 
+  string_buf_ptr = string_buf;
+}
 
 <STRING>"\"" {
-  /* strcpy(string_buf_ptr, "\0"); */
+  /* strcpy(string_buf_ptr, "\0"); 
+  
+   do we need to add \0 here ?*/
   cool_yylval.symbol = stringtable.add_string(string_buf);
   string_buf_ptr = string_buf;
   BEGIN 0;
   return STR_CONST;
 }
 
-"\"" { 
-  BEGIN (STRING); 
-  string_buf_ptr = string_buf;
+ /* need to check string length max in all of these maybe we can have a 
+  helper fun or switch ? lowkey we can also just redo the same code block if 
+  they dont grade for style. */
+
+<STRING>"\\b" {
+  *string_buf_ptr++ = '\b';
 }
 
-<STRING>\[^nbtf.]
+<STRING>"\\f" {
+  *string_buf_ptr++ = '\f';
+}
+
+<STRING>"\\n" {
+  *string_buf_ptr++ = '\n';
+}
+
+<STRING>"\\t" {
+  *string_buf_ptr++ = '\t';
+}
+
+<STRING>\\[^bfnt] { /* do we need \0 here ? */
+  *string_buf_ptr++ = yytext[1];
+}
+
+<STRING>"\\\0" {  /* I dont know how to make a test for this */
+  cool_yylval.error_msg = "String contains null character";
+  BEGIN 0;
+  return ERROR;
+}
+
 
 <STRING>[^"\""<<EOF>>"\n"] { 
   strcpy(string_buf_ptr, yytext); 
