@@ -135,10 +135,9 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <features> optional_feature_list
 %type <feature> feature
 %type <expression> expr
-
-/*
 %type <formal> formal   
 
+/*
 %type <formals> formals  
 %type <expression> expr
 %type <expressions> exprs */
@@ -181,22 +180,25 @@ optional_feature_list:
 | error {};
 
 /* end of grammar */
-feature : 
-OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
+feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' {}
+| OBJECTID '(' ')' ':' TYPEID '{' expr '}'
+| OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
 | OBJECTID ':' TYPEID ASSIGN expr ';' {$$ = attr($1, $3, $5); }
 | error {};
 
-/* formal : OBJECTID ':' TYPEID { $$ = formal($1, $3); }
-| error {}; */
+formal : OBJECTID ':' TYPEID { $$ = formal($1, $3); }
+| error {};
+
+optional_formals_list:
+{  $$ = nil_Formals(); }
+| formal 
+{single_Formals($1); }
+| optional_formals_list ',' formal 
+{ $$ = append_Formals(single_Formals($1), $2);} 
+| error {};
 
 expr : BOOL_CONST { $$ = bool_const($1); } ;
-/* feature : OBJECTID '(' formals ')' ':' TYPEID '{'  expr '}'
-| OBJECTID ':' TYPEID 
-| OBJECTID ':' TYPEID ASSIGN expr
-| error ; */
 
-/*formal : OBJECTID ':' TYPEID
-; */
 %%
 
 
