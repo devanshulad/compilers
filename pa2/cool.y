@@ -136,9 +136,9 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <feature> feature
 %type <expression> expr
 %type <formal> formal   
+%type <formals> optional_formals_list  
 
 /*
-%type <formals> formals  
 %type <expression> expr
 %type <expressions> exprs */
 /* Precedence declarations go here. */
@@ -180,8 +180,8 @@ optional_feature_list:
 | error {};
 
 /* end of grammar */
-feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' {}
-| OBJECTID '(' ')' ':' TYPEID '{' expr '}'
+feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, $3, $6, $8); }
+| OBJECTID '('')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, nil_Formals(), $5, $7); }
 | OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
 | OBJECTID ':' TYPEID ASSIGN expr ';' {$$ = attr($1, $3, $5); }
 | error {};
@@ -190,12 +190,13 @@ formal : OBJECTID ':' TYPEID { $$ = formal($1, $3); }
 | error {};
 
 optional_formals_list:
-{  $$ = nil_Formals(); }
-| formal 
-{single_Formals($1); }
+/* {  $$ = nil_Formals(); } */
+formal 
+{ $$ = single_Formals($1); }
 | optional_formals_list ',' formal 
-{ $$ = append_Formals(single_Formals($1), $2);} 
-| error {};
+{ $$ = append_Formals($1, single_Formals($3));} 
+| error ',' {}
+;
 
 expr : BOOL_CONST { $$ = bool_const($1); } ;
 
