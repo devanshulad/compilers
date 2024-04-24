@@ -134,8 +134,11 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <class_> class
 %type <features> optional_feature_list
 %type <feature> feature
+%type <expression> expr
+
 /*
 %type <formal> formal   
+
 %type <formals> formals  
 %type <expression> expr
 %type <expressions> exprs */
@@ -173,18 +176,20 @@ class	: CLASS TYPEID '{' optional_feature_list '}' ';'
 /* Feature list may be empty, but no empty features in list. */
 optional_feature_list:
 {  $$ = nil_Features(); }
-| feature
-{ $$ = single_Features($1); }
-;
-/*
-| optional_feature_list feature
-{ $$ = append_Features($1, single_Features($2));} 
-| error ;
-;
-/* end of grammar */
-feature : OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
+| feature optional_feature_list 
+{ $$ = append_Features(single_Features($1), $2);} 
 | error {};
 
+/* end of grammar */
+feature : 
+OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
+| OBJECTID ':' TYPEID ASSIGN expr ';' {$$ = attr($1, $3, $5); }
+| error {};
+
+/* formal : OBJECTID ':' TYPEID { $$ = formal($1, $3); }
+| error {}; */
+
+expr : BOOL_CONST { $$ = bool_const($1); } ;
 /* feature : OBJECTID '(' formals ')' ':' TYPEID '{'  expr '}'
 | OBJECTID ':' TYPEID 
 | OBJECTID ':' TYPEID ASSIGN expr

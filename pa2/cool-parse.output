@@ -17,8 +17,6 @@ Terminals unused in grammar
     ISVOID
     STR_CONST
     INT_CONST
-    BOOL_CONST
-    ASSIGN
     NOT
     LE
     ERROR
@@ -31,6 +29,9 @@ Terminals unused in grammar
     '~'
     '@'
     '.'
+
+
+State 11 conflicts: 1 reduce/reduce
 
 
 Grammar
@@ -46,10 +47,14 @@ Grammar
     5      | CLASS TYPEID INHERITS TYPEID '{' optional_feature_list '}' ';'
 
     6 optional_feature_list: %empty
-    7                      | feature
+    7                      | feature optional_feature_list
+    8                      | error
 
-    8 feature: OBJECTID ':' TYPEID ';'
-    9        | error
+    9 feature: OBJECTID ':' TYPEID ';'
+   10        | OBJECTID ':' TYPEID ASSIGN expr ';'
+   11        | error
+
+   12 expr: BOOL_CONST
 
 
 Terminals, with rules where they appear
@@ -60,15 +65,15 @@ Terminals, with rules where they appear
     '-' (45)
     '.' (46)
     '/' (47)
-    ':' (58) 8
-    ';' (59) 4 5 8
+    ':' (58) 9 10
+    ';' (59) 4 5 9 10
     '<' (60)
     '=' (61)
     '@' (64)
     '{' (123) 4 5
     '}' (125) 4 5
     '~' (126)
-    error (256) 9
+    error (256) 8 11
     CLASS (258) 4 5
     ELSE (259)
     FI (260)
@@ -88,10 +93,10 @@ Terminals, with rules where they appear
     ISVOID (274)
     STR_CONST <symbol> (275)
     INT_CONST <symbol> (276)
-    BOOL_CONST <boolean> (277)
-    TYPEID <symbol> (278) 4 5 8
-    OBJECTID <symbol> (279) 8
-    ASSIGN (280)
+    BOOL_CONST <boolean> (277) 12
+    TYPEID <symbol> (278) 4 5 9 10
+    OBJECTID <symbol> (279) 9 10
+    ASSIGN (280) 10
     NOT (281)
     LE (282)
     ERROR (283)
@@ -111,11 +116,14 @@ Nonterminals, with rules where they appear
         on left: 4 5
         on right: 2 3
     optional_feature_list <features> (46)
-        on left: 6 7
-        on right: 4 5
+        on left: 6 7 8
+        on right: 4 5 7
     feature <feature> (47)
-        on left: 8 9
+        on left: 9 10 11
         on right: 7
+    expr <expression> (48)
+        on left: 12
+        on right: 10
 
 
 State 0
@@ -215,14 +223,18 @@ State 10
 
 State 11
 
-    9 feature: error .
+    8 optional_feature_list: error .
+   11 feature: error .
 
-    $default  reduce using rule 9 (feature)
+    '}'       reduce using rule 8 (optional_feature_list)
+    '}'       [reduce using rule 11 (feature)]
+    $default  reduce using rule 11 (feature)
 
 
 State 12
 
-    8 feature: OBJECTID . ':' TYPEID ';'
+    9 feature: OBJECTID . ':' TYPEID ';'
+   10        | OBJECTID . ':' TYPEID ASSIGN expr ';'
 
     ':'  shift, and go to state 16
 
@@ -236,9 +248,15 @@ State 13
 
 State 14
 
-    7 optional_feature_list: feature .
+    7 optional_feature_list: feature . optional_feature_list
 
-    $default  reduce using rule 7 (optional_feature_list)
+    error     shift, and go to state 11
+    OBJECTID  shift, and go to state 12
+
+    '}'  reduce using rule 6 (optional_feature_list)
+
+    optional_feature_list  go to state 18
+    feature                go to state 14
 
 
 State 15
@@ -250,61 +268,101 @@ State 15
 
     '}'  reduce using rule 6 (optional_feature_list)
 
-    optional_feature_list  go to state 18
+    optional_feature_list  go to state 19
     feature                go to state 14
 
 
 State 16
 
-    8 feature: OBJECTID ':' . TYPEID ';'
+    9 feature: OBJECTID ':' . TYPEID ';'
+   10        | OBJECTID ':' . TYPEID ASSIGN expr ';'
 
-    TYPEID  shift, and go to state 19
+    TYPEID  shift, and go to state 20
 
 
 State 17
 
     4 class: CLASS TYPEID '{' optional_feature_list '}' . ';'
 
-    ';'  shift, and go to state 20
+    ';'  shift, and go to state 21
 
 
 State 18
 
-    5 class: CLASS TYPEID INHERITS TYPEID '{' optional_feature_list . '}' ';'
+    7 optional_feature_list: feature optional_feature_list .
 
-    '}'  shift, and go to state 21
+    $default  reduce using rule 7 (optional_feature_list)
 
 
 State 19
 
-    8 feature: OBJECTID ':' TYPEID . ';'
+    5 class: CLASS TYPEID INHERITS TYPEID '{' optional_feature_list . '}' ';'
 
-    ';'  shift, and go to state 22
+    '}'  shift, and go to state 22
 
 
 State 20
+
+    9 feature: OBJECTID ':' TYPEID . ';'
+   10        | OBJECTID ':' TYPEID . ASSIGN expr ';'
+
+    ASSIGN  shift, and go to state 23
+    ';'     shift, and go to state 24
+
+
+State 21
 
     4 class: CLASS TYPEID '{' optional_feature_list '}' ';' .
 
     $default  reduce using rule 4 (class)
 
 
-State 21
+State 22
 
     5 class: CLASS TYPEID INHERITS TYPEID '{' optional_feature_list '}' . ';'
 
-    ';'  shift, and go to state 23
-
-
-State 22
-
-    8 feature: OBJECTID ':' TYPEID ';' .
-
-    $default  reduce using rule 8 (feature)
+    ';'  shift, and go to state 25
 
 
 State 23
 
+   10 feature: OBJECTID ':' TYPEID ASSIGN . expr ';'
+
+    BOOL_CONST  shift, and go to state 26
+
+    expr  go to state 27
+
+
+State 24
+
+    9 feature: OBJECTID ':' TYPEID ';' .
+
+    $default  reduce using rule 9 (feature)
+
+
+State 25
+
     5 class: CLASS TYPEID INHERITS TYPEID '{' optional_feature_list '}' ';' .
 
     $default  reduce using rule 5 (class)
+
+
+State 26
+
+   12 expr: BOOL_CONST .
+
+    $default  reduce using rule 12 (expr)
+
+
+State 27
+
+   10 feature: OBJECTID ':' TYPEID ASSIGN expr . ';'
+
+    ';'  shift, and go to state 28
+
+
+State 28
+
+   10 feature: OBJECTID ':' TYPEID ASSIGN expr ';' .
+
+    $default  reduce using rule 10 (feature)
