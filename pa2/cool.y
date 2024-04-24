@@ -141,11 +141,11 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 /* Precedence declarations go here. */
 
 %right ASSIGN
-%precendence NOT  /* Double check that this is precendence and not left. Assuming precendence for unary operations. */
-%precendence LE, '<', '='
+%left  NOT  /* Double check that this is precendence and not left. Assuming precendence for unary operations. */
+%nonassoc LE, '<', '='
 %left '+', '-'
 %left '*', '/'
-%left ISVOID
+%left ISVOID      
 %left '~'
 %left '@'
 %left '.'
@@ -171,7 +171,22 @@ class	: CLASS TYPEID '{' optional_feature_list '}' ';'
 /* Feature list may be empty, but no empty features in list. */
 optional_feature_list:		/* empty */
 {  $$ = nil_Features(); }
+| feature
+{ $$ = single_Features($1); }
+| optional_feature_list feature
+{ $$ = append_Features($1, single_Features($2));} 
+| error ;
+;
 /* end of grammar */
+
+feature : OBJECTID '(' formals ')' ':' TYPEID '{' expr '}'
+| OBJECTID ':' TYPEID 
+| OBJECTID ':' TYPEID ASSIGN expr
+| error ;
+
+formal : OBJECTID ':' TYPEID
+;
+
 %%
 
 /* This function is called automatically when Bison detects a parse error. */
