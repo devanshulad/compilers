@@ -135,6 +135,8 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <features> optional_feature_list
 %type <feature> feature
 %type <expression> expr
+%type <expressions> optional_id_expr_list
+%type <expressions> expr_body_list
 %type <formal> formal   
 %type <formals> optional_formals_list  
 
@@ -179,6 +181,7 @@ optional_feature_list:
 { $$ = append_Features(single_Features($1), $2);} 
 | error {};
 
+
 /* end of grammar */
 feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, $3, $6, $8); }
 | OBJECTID '('')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, nil_Formals(), $5, $7); }
@@ -195,8 +198,17 @@ formal
 { $$ = single_Formals($1); }
 | optional_formals_list ',' formal 
 { $$ = append_Formals($1, single_Formals($3));} 
-| error ',' {}
-;
+| error ',' {};
+
+optional_id_expr_list:
+expr {$$ = single_Expressions($1); }
+| optional_id_expr_list ',' expr {$$ = append_Expressions($1, single_Expressions($3));}
+| error ',' {};
+
+expr_body_list:
+expr ';' {$$ = single_Expressions($1); }
+| expr ';' expr_body_list {$$ = append_Expressions(single_Expressions($1), $3);}
+| error {};
 
 expr : OBJECTID ASSIGN expr {$$ = assign ($1, $3);}
 | BOOL_CONST { $$ = bool_const($1); }
@@ -211,6 +223,19 @@ expr : OBJECTID ASSIGN expr {$$ = assign ($1, $3);}
 | expr '=' expr { $$ = eq($1, $3); }
 | NOT expr { $$ = comp($2); }
 | '~' expr { $$ = neg($2); }
+| NEW TYPEID { $$ = new_($2); }
+| ISVOID expr { $$ = isvoid($2); }
+| OBJECTID { $$ = object($1); }
+| '(' expr ')' { $$ = $2; } /* double check this */
+| WHILE expr LOOP expr POOL { $$ = loop($2, $4); }
+| IF expr THEN expr ELSE expr FI {$$ = cond($2, $4, $6);}
+| OBJECTID '(' optional_id_expr_list ')' {$$ = dispatch(object(idtable.add_string("self")), $1, $3); }
+| OBJECTID '(' ')' {$$ = dispatch(object(idtable.add_string("self")), $1, nil_Expressions()); }
+| expr '@' TYPEID '.' OBJECTID '(' optional_id_expr_list ')' {$$ = static_dispatch($1, $3, $5, $7);}
+| expr '@' TYPEID '.' OBJECTID '(' ')' {$$ = static_dispatch($1, $3, $5, nil_Expressions());}
+| expr '.' OBJECTID '(' optional_id_expr_list ')' {$$ = dispatch($1, $3, $5);}
+| expr '.' OBJECTID '(' ')' {$$ = dispatch($1, $3, nil_Expressions());}
+| '{' expr_body_list '}' { $$ = block($2); }
 | error {};
 
 %%
