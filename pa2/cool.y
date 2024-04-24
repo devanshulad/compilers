@@ -198,7 +198,20 @@ formal
 | error ',' {}
 ;
 
-expr : BOOL_CONST { $$ = bool_const($1); } ;
+expr : OBJECTID ASSIGN expr {$$ = assign ($1, $3);}
+| BOOL_CONST { $$ = bool_const($1); }
+| INT_CONST { $$ = int_const($1); }
+| STR_CONST { $$ = string_const($1); }
+| expr '+' expr { $$ = plus($1, $3); }
+| expr '-' expr { $$ = sub($1, $3); }
+| expr '*' expr { $$ = mul($1, $3); }
+| expr '/' expr { $$ = divide($1, $3); }
+| expr '<' expr { $$ = lt($1, $3); }
+| expr LE expr { $$ = leq($1, $3); }
+| expr '=' expr { $$ = eq($1, $3); }
+| NOT expr { $$ = comp($2); }
+| '~' expr { $$ = neg($2); }
+| error {};
 
 %%
 
