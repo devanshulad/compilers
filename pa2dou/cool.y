@@ -133,23 +133,9 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <classes> class_list
 %type <class_> class
 %type <features> optional_feature_list
-%type <feature> feature
-/*
-%type <formal> formal   
-%type <formals> formals  
-%type <expression> expr
-%type <expressions> exprs */
+
 /* Precedence declarations go here. */
 
-%right ASSIGN
-%left  NOT  /* Double check that this is precendence and not left. Assuming precendence for unary operations. */
-%nonassoc LE '<' '='
-%left '+' '-'
-%left '*' '/'
-%left ISVOID      
-%left '~'
-%left '@'
-%left '.'
 
 %%
 // Save the root of the abstract syntax tree in a global variable.
@@ -168,32 +154,14 @@ class	: CLASS TYPEID '{' optional_feature_list '}' ';'
 { $$ = class_($2,idtable.add_string("Object"),$4,
 	      stringtable.add_string(curr_filename)); }
 | CLASS TYPEID INHERITS TYPEID '{' optional_feature_list '}' ';'
-{ $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); };
+{ $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); }
+;
 
 /* Feature list may be empty, but no empty features in list. */
-optional_feature_list:
+optional_feature_list:		/* empty */
 {  $$ = nil_Features(); }
-| feature
-{ $$ = single_Features($1); }
-;
-/*
-| optional_feature_list feature
-{ $$ = append_Features($1, single_Features($2));} 
-| error ;
-;
 /* end of grammar */
-feature : OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
-| error {};
-
-/* feature : OBJECTID '(' formals ')' ':' TYPEID '{'  expr '}'
-| OBJECTID ':' TYPEID 
-| OBJECTID ':' TYPEID ASSIGN expr
-| error ; */
-
-/*formal : OBJECTID ':' TYPEID
-; */
 %%
-
 
 /* This function is called automatically when Bison detects a parse error. */
 void yyerror(const char *s)
