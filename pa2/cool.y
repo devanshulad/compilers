@@ -140,7 +140,6 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <formal> formal   
 %type <formals> optional_formals_list  
 %type <cases> case_list
-`12
 
 /*
 %type <expression> expr
@@ -218,14 +217,10 @@ OBJECTID ':' TYPEID DARROW expr ';' {$$ = single_Cases(branch($1, $3, $5)); }
 | error {};
 
 let_expr:
-',' OBJECTID ':' TYPEID {$$ = single_Cases(branch($1, $3, $5)); }
-| ',' OBJECTID ':' TYPEID ASSIGN expr { $$ = append_Cases(single_Cases(branch($1, $3, $5)), $7);}
+',' OBJECTID ':' TYPEID let_expr {$$ = let($2, $4, no_expr(), $6);} /* Double check this */
+| ',' OBJECTID ':' TYPEID ASSIGN expr let_expr { $$ = let($2, $4, $6, $8);}
 | error {};
 
-let_list:
-let_expr {}
-| let_expr let_list {}
-| error {};
 
 expr : OBJECTID ASSIGN expr {$$ = assign ($1, $3);}
 | BOOL_CONST { $$ = bool_const($1); }
@@ -254,6 +249,10 @@ expr : OBJECTID ASSIGN expr {$$ = assign ($1, $3);}
 | expr '.' OBJECTID '(' ')' {$$ = dispatch($1, $3, nil_Expressions());}
 | '{' expr_body_list '}' { $$ = block($2); }
 | CASE expr OF case_list ESAC {$$ = typcase ($2, $4); } 
+| LET OBJECTID ':' TYPEID let_expr IN expr {}
+| LET OBJECTID ':' TYPEID ASSIGN expr let_expr IN expr {}
+| LET OBJECTID ':' TYPEID IN expr {$$ = let($2, $4, no_expr(), $6); }
+| LET OBJECTID ':' TYPEID ASSIGN expr IN expr {$$ = let($2, $4, $6, $8);}
 | error {};
 
 %%
