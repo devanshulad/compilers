@@ -140,6 +140,8 @@ int omerrs = 0;               /* number of erros in lexing and parsing */
 %type <formal> formal   
 %type <formals> optional_formals_list  
 %type <cases> case_list
+%type <expression> let_expr
+%type <expression> multi_let
 
 /*
 %type <expression> expr
@@ -176,16 +178,14 @@ class	: CLASS TYPEID '{' optional_feature_list '}' ';'
 { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); };
 
 /* Feature list may be empty, but no empty features in list. */
-optional_feature_list:
-{  $$ = nil_Features(); }
-| feature optional_feature_list 
-{ $$ = append_Features(single_Features($1), $2);} 
+optional_feature_list: {  $$ = nil_Features(); }
+| feature optional_feature_list { $$ = append_Features(single_Features($1), $2);} 
 | error {};
 
 
 /* end of grammar */
-feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, $3, $6, $8); }
-| OBJECTID '('')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, nil_Formals(), $5, $7); }
+feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, $3, $6, $8);}
+| OBJECTID '('')' ':' TYPEID '{' expr '}' ';' {$$ = method($1, nil_Formals(), $5, $7);}
 | OBJECTID ':' TYPEID ';' {$$ = attr($1, $3, no_expr()); }
 | OBJECTID ':' TYPEID ASSIGN expr ';' {$$ = attr($1, $3, $5); }
 | error {};
@@ -193,12 +193,8 @@ feature : OBJECTID '(' optional_formals_list ')' ':' TYPEID '{' expr '}' ';' {$$
 formal : OBJECTID ':' TYPEID { $$ = formal($1, $3); }
 | error {};
 
-optional_formals_list:
-/* {  $$ = nil_Formals(); } */
-formal 
-{ $$ = single_Formals($1); }
-| optional_formals_list ',' formal 
-{ $$ = append_Formals($1, single_Formals($3));} 
+optional_formals_list: formal { $$ = single_Formals($1); }
+| optional_formals_list ',' formal { $$ = append_Formals($1, single_Formals($3));} 
 | error ',' {};
 
 optional_id_expr_list:
@@ -206,53 +202,52 @@ expr {$$ = single_Expressions($1); }
 | optional_id_expr_list ',' expr {$$ = append_Expressions($1, single_Expressions($3));}
 | error ',' {};
 
-expr_body_list:
-expr ';' {$$ = single_Expressions($1); }
+expr_body_list: expr ';' {$$ = single_Expressions($1);}
 | expr ';' expr_body_list {$$ = append_Expressions(single_Expressions($1), $3);}
 | error {};
 
-case_list:
-OBJECTID ':' TYPEID DARROW expr ';' {$$ = single_Cases(branch($1, $3, $5)); }
+case_list: OBJECTID ':' TYPEID DARROW expr ';' {$$ = single_Cases(branch($1, $3, $5));}
 | OBJECTID ':' TYPEID DARROW expr ';' case_list { $$ = append_Cases(single_Cases(branch($1, $3, $5)), $7);}
 | error {};
 
-let_expr:
-',' OBJECTID ':' TYPEID let_expr {$$ = let($2, $4, no_expr(), $6);} /* Double check this */
-| ',' OBJECTID ':' TYPEID ASSIGN expr let_expr { $$ = let($2, $4, $6, $8);}
+let_expr: OBJECTID ':' TYPEID IN expr {$$ = let($1, $3, no_expr(), $5);}
+| OBJECTID ':' TYPEID ASSIGN expr IN expr {$$ = let($1, $3, $5, $7);}
 | error {};
 
+multi_let:
+let_expr {$$ = $1; }
+| OBJECTID ':' TYPEID ',' multi_let {$$ = let($1, $3, no_expr(), $5);}
+| OBJECTID ':' TYPEID ASSIGN expr ',' multi_let {$$ = let($1, $3, $5, $7);} 
+;
 
 expr : OBJECTID ASSIGN expr {$$ = assign ($1, $3);}
-| BOOL_CONST { $$ = bool_const($1); }
-| INT_CONST { $$ = int_const($1); }
-| STR_CONST { $$ = string_const($1); }
-| expr '+' expr { $$ = plus($1, $3); }
-| expr '-' expr { $$ = sub($1, $3); }
-| expr '*' expr { $$ = mul($1, $3); }
-| expr '/' expr { $$ = divide($1, $3); }
-| expr '<' expr { $$ = lt($1, $3); }
-| expr LE expr { $$ = leq($1, $3); }
-| expr '=' expr { $$ = eq($1, $3); }
-| NOT expr { $$ = comp($2); }
-| '~' expr { $$ = neg($2); }
-| NEW TYPEID { $$ = new_($2); }
-| ISVOID expr { $$ = isvoid($2); }
-| OBJECTID { $$ = object($1); }
-| '(' expr ')' { $$ = $2; } /* double check this */
-| WHILE expr LOOP expr POOL { $$ = loop($2, $4); }
+| BOOL_CONST { $$ = bool_const($1);}
+| INT_CONST { $$ = int_const($1);}
+| STR_CONST { $$ = string_const($1);}
+| expr '+' expr { $$ = plus($1, $3);}
+| expr '-' expr { $$ = sub($1, $3);}
+| expr '*' expr { $$ = mul($1, $3);}
+| expr '/' expr { $$ = divide($1, $3);}
+| expr '<' expr { $$ = lt($1, $3);}
+| expr LE expr { $$ = leq($1, $3);}
+| expr '=' expr { $$ = eq($1, $3);}
+| NOT expr { $$ = comp($2);}
+| '~' expr { $$ = neg($2);}
+| NEW TYPEID { $$ = new_($2);}
+| ISVOID expr { $$ = isvoid($2);}
+| OBJECTID { $$ = object($1);}
+| '(' expr ')' { $$ = $2;} /* double check this */
+| WHILE expr LOOP expr POOL { $$ = loop($2, $4);}
 | IF expr THEN expr ELSE expr FI {$$ = cond($2, $4, $6);}
-| OBJECTID '(' optional_id_expr_list ')' {$$ = dispatch(object(idtable.add_string("self")), $1, $3); }
-| OBJECTID '(' ')' {$$ = dispatch(object(idtable.add_string("self")), $1, nil_Expressions()); }
+| OBJECTID '(' optional_id_expr_list ')' {$$ = dispatch(object(idtable.add_string("self")), $1, $3);}
+| OBJECTID '(' ')' {$$ = dispatch(object(idtable.add_string("self")), $1, nil_Expressions());}
 | expr '@' TYPEID '.' OBJECTID '(' optional_id_expr_list ')' {$$ = static_dispatch($1, $3, $5, $7);}
 | expr '@' TYPEID '.' OBJECTID '(' ')' {$$ = static_dispatch($1, $3, $5, nil_Expressions());}
 | expr '.' OBJECTID '(' optional_id_expr_list ')' {$$ = dispatch($1, $3, $5);}
 | expr '.' OBJECTID '(' ')' {$$ = dispatch($1, $3, nil_Expressions());}
-| '{' expr_body_list '}' { $$ = block($2); }
-| CASE expr OF case_list ESAC {$$ = typcase ($2, $4); } 
-| LET OBJECTID ':' TYPEID let_expr IN expr {}
-| LET OBJECTID ':' TYPEID ASSIGN expr let_expr IN expr {}
-| LET OBJECTID ':' TYPEID IN expr {$$ = let($2, $4, no_expr(), $6); }
-| LET OBJECTID ':' TYPEID ASSIGN expr IN expr {$$ = let($2, $4, $6, $8);}
+| '{' expr_body_list '}' { $$ = block($2);}
+| CASE expr OF case_list ESAC {$$ = typcase ($2, $4);} 
+| LET multi_let {$$ = $2;}
 | error {};
 
 %%
