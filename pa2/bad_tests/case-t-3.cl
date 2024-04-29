@@ -3,9 +3,22 @@ class A {
         {
             hello <- 2;
             case hello of
-                Int : Int => 3 * 3;
-                b : Bool => true;
                 Bool : Int => 4 - 2;
+                Int : Int => A;
+                b : Bool => true;
+            esac;
+        }
+    };
+};
+
+class AB {
+    case_func (): Int {
+        {
+            case hello of
+                hello : Int => 4 - 2;
+                Int : Int => A;
+                hello : Int => 5; 
+                b : Bool => true;
             esac;
         }
     };
