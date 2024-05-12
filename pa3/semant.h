@@ -6,6 +6,8 @@
 #include "stringtab.h"
 #include "symtab.h"
 #include <list>
+#include <map>
+#include <set>
 
 #define TRUE 1
 #define FALSE 0
@@ -25,6 +27,13 @@ private:
   int semant_errors;           // counts the number of semantic errors
   void install_basic_classes();
   std::ostream& error_stream;
+  std::map <Symbol, Class_> class_list;
+  void add_classes_check_duplicates(Classes classes);
+  void check_inheritance ();
+  void check_acyclic ();
+  void check_cycle_for_class (Class_& curr_class, std::set<Symbol>& visited);
+
+
 
 public:
   ClassTable(Classes);
@@ -32,7 +41,7 @@ public:
   std::ostream& semant_error();
   std::ostream& semant_error(Class_ c);
   std::ostream& semant_error(Symbol filename, tree_node *t);
-  std::map <Symbol, Class_> class_list;
+
 };
 
 
