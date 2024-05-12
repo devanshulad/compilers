@@ -88,8 +88,51 @@ static void initialize_constants(void) {
 
 ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   /* Fill this in */
-  install_basic_classes()
+  install_basic_classes();
+  add_classes_check_duplicates (classes);
+  check_inheritance();
+  check_acyclic();
+}
 
+void ClassTable::add_classes_check_duplicates(Classes classes) {
+  for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
+    Class_ curr_class = classes->nth(i);
+    Symbol curr_name = curr_class->getName();
+    if (class_list.count(curr_name) > 0) {
+      // double check this error msg
+      semant_error(curr_class);
+    }
+    class_list[curr_name] = curr_class;
+  }
+}
+
+void ClassTable::check_inheritance() {
+  for (auto& name_class: class_list) {
+    Symbol curr_name = name_class.first;
+    Class_ curr_class = name_class.second;
+
+    if (curr_class->getParent() != No_class && class_list.count(curr_class->getParent()) == 0)
+      semant_error(curr_class);
+  }
+}
+
+void ClassTable::check_acyclic() {
+  for (auto& name_class: class_list) {
+    std::set<Symbol> visited;
+    check_cycle_for_class(name_class.second, visited);
+  }
+}
+
+void ClassTable::check_cycle_for_class(Class_& curr_class, std::set<Symbol>& visited) {
+  if (visited.find(curr_class->getParent()) != visited.end()) {
+    semant_error(curr_class);
+    return;
+  }
+  visited.insert(curr_class->getName());
+
+  // following if should always be true
+  if (class_list.count(curr_class->getParent()) != 0)
+    check_cycle_for_class (class_list[curr_class->getParent()], visited);
 }
 
 void ClassTable::install_basic_classes() {
@@ -126,7 +169,7 @@ void ClassTable::install_basic_classes() {
            single_Features(method(type_name, nil_Formals(), Str, no_expr()))),
            single_Features(method(::copy, nil_Formals(), SELF_TYPE, no_expr()))),
 	   filename);
-     classtable[Object] = Object_class;
+    class_list[Object] = Object_class;
 
   //
   // The IO class inherits from Object. Its methods are
@@ -149,7 +192,7 @@ void ClassTable::install_basic_classes() {
             single_Features(method(in_string, nil_Formals(), Str, no_expr()))),
             single_Features(method(in_int, nil_Formals(), Int, no_expr()))),
 	    filename);
-      classtable[IO] = IO_class;
+    class_list[IO] = IO_class;
 
   //
   // The Int class has no methods and only a single attribute, the
@@ -161,7 +204,7 @@ void ClassTable::install_basic_classes() {
 	     Object,
 	     single_Features(attr(val, prim_slot, no_expr())),
 	     filename);
-      classtable[Int] = Int_class;
+      class_list[Int] = Int_class;
 
 
   //
@@ -170,7 +213,7 @@ void ClassTable::install_basic_classes() {
 
   Class_ Bool_class =
       class_(Bool, Object, single_Features(attr(val, prim_slot, no_expr())),filename);
-      classtable[Bool] = Bool_class;
+      class_list[Bool] = Bool_class;
 
   //
   // The class Str has a number of slots and operations:
@@ -201,16 +244,7 @@ void ClassTable::install_basic_classes() {
 				   Str,
 				   no_expr()))),
 	     filename);
-      classtable[Str] = Str_class;
-  
-  for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
-    Class_ curr_class = classes->nth(i);
-    Symbol curr_name = curr_class->get_name();
-    if (class_list.count(curr_name) > 0) {
-      // error that previously defined 
-    }
-    // check the inheritace maybe i think ??
-  }
+      class_list[Str] = Str_class;
 }
 
 ////////////////////////////////////////////////////////////////////
