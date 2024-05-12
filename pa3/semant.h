@@ -32,6 +32,7 @@ public:
   std::ostream& semant_error();
   std::ostream& semant_error(Class_ c);
   std::ostream& semant_error(Symbol filename, tree_node *t);
+  std::map <Symbol, Class_> class_list;
 };
 
 

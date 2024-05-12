@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include "semant.h"
 #include "utilities.h"
+#include <iostream>
 
 extern int semant_debug;
 extern char *curr_filename;
@@ -87,6 +88,8 @@ static void initialize_constants(void) {
 
 ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   /* Fill this in */
+  install_basic_classes()
+
 }
 
 void ClassTable::install_basic_classes() {
@@ -123,6 +126,7 @@ void ClassTable::install_basic_classes() {
            single_Features(method(type_name, nil_Formals(), Str, no_expr()))),
            single_Features(method(::copy, nil_Formals(), SELF_TYPE, no_expr()))),
 	   filename);
+     classtable[Object] = Object_class;
 
   //
   // The IO class inherits from Object. Its methods are
@@ -145,6 +149,7 @@ void ClassTable::install_basic_classes() {
             single_Features(method(in_string, nil_Formals(), Str, no_expr()))),
             single_Features(method(in_int, nil_Formals(), Int, no_expr()))),
 	    filename);
+      classtable[IO] = IO_class;
 
   //
   // The Int class has no methods and only a single attribute, the
@@ -156,6 +161,8 @@ void ClassTable::install_basic_classes() {
 	     Object,
 	     single_Features(attr(val, prim_slot, no_expr())),
 	     filename);
+      classtable[Int] = Int_class;
+
 
   //
   // Bool also has only the "val" slot.
@@ -163,6 +170,7 @@ void ClassTable::install_basic_classes() {
 
   Class_ Bool_class =
       class_(Bool, Object, single_Features(attr(val, prim_slot, no_expr())),filename);
+      classtable[Bool] = Bool_class;
 
   //
   // The class Str has a number of slots and operations:
@@ -193,6 +201,16 @@ void ClassTable::install_basic_classes() {
 				   Str,
 				   no_expr()))),
 	     filename);
+      classtable[Str] = Str_class;
+  
+  for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
+    Class_ curr_class = classes->nth(i);
+    Symbol curr_name = curr_class->get_name();
+    if (class_list.count(curr_name) > 0) {
+      // error that previously defined 
+    }
+    // check the inheritace maybe i think ??
+  }
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -245,6 +263,12 @@ ostream& ClassTable::semant_error()
  */
 void program_class::semant() {
    initialize_constants();
+   //cout << "HIIIIIIIIIII\n\n" << endl;
+  //  cout << classes << endl;
+  // for(int i = classes->first(); classes->more(i); i = classes->next(i))
+  // {
+  //   cout << classes->nth(i)->dump(cout)<< " hi " << endl;
+  // }
 
     /* ClassTable constructor may do some semantic analysis */
    ClassTableP classtable = new ClassTable(classes);
