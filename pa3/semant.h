@@ -8,6 +8,8 @@
 #include <list>
 #include <map>
 #include <set>
+#include <vector>
+
 
 #define TRUE 1
 #define FALSE 0
@@ -30,6 +32,8 @@ private:
   std::map <Symbol, Class_> class_list;
   std::map <Symbol, std::map <Symbol, method_class*>> all_method_list;
   std::map <Symbol, std::map <Symbol, attr_class*>> all_attr_list;
+  std::map <Symbol, std::vector<Symbol>> inheritance_map_class;
+
   void add_classes_check_duplicates(Classes classes);
   void check_inheritance ();
   void check_acyclic ();
@@ -37,6 +41,8 @@ private:
   void check_main ();
   void exit_func ();
   void add_methods(Classes classes);
+  void create_inheritance (Classes classes);
+  void check_features_inheritance ();
 
 
 

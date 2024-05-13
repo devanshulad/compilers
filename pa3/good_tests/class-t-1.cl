@@ -8,6 +8,6 @@ class E inherits B {};
 
 class Main {
     main(): Bool {
-        True
+        true
     };
-}
+};

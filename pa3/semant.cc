@@ -6,6 +6,7 @@
 #include "semant.h"
 #include "utilities.h"
 #include <iostream>
+#include <vector>
 
 extern int semant_debug;
 extern char *curr_filename;
@@ -108,9 +109,9 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   exit_func();
   add_methods(classes);
   exit_func();
+  create_inheritance (classes);
+  check_features_inheritance ();
 }
-
-
 
 void ClassTable::add_classes_check_duplicates(Classes classes) {
   for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
@@ -214,6 +215,69 @@ void ClassTable::add_methods(Classes classes) {
     }
     all_method_list[class_name] = curr_class_method_list;
     all_attr_list[class_name] = curr_class_attr_list;
+  }
+}
+
+void ClassTable::create_inheritance (Classes classes) {
+  // does not add no_class as a parent
+  for (auto& name_class: class_list) {
+    Class_ curr_class = name_class.second;
+    Symbol curr_name = name_class.first;
+    Symbol curr_parent = curr_class->getParent();
+
+    std::vector<Symbol> val;
+
+    if (curr_parent != No_class)
+      val.push_back(curr_parent);
+
+    while (curr_parent != No_class) {
+      Class_ parent = class_list[curr_parent];
+
+      Symbol new_parent = parent->getParent();
+      if (new_parent != No_class) {
+        val.push_back(new_parent);
+      }
+      curr_parent = new_parent;
+    }
+
+    inheritance_map_class[curr_class->getName()] = val;
+    // code to print out inheritance map
+    // std::cout << "Current class is " << curr_name << ": ";
+    // for (Symbol element : val) {
+    //     std::cout << element << ", ";
+    // }
+    // std::cout << std::endl;
+  }
+}
+
+// function to make sure methods and attributes are okay with inheritance
+void ClassTable::check_features_inheritance() {
+  // loop through all of the "class: list of parent class" entries
+  for (auto& name_parents_list: inheritance_map_class) {
+    std::vector<Symbol> parents_list = name_parents_list.second;
+    curr_name = name_parents_list.first;
+    auto my_features = class_list[curr_name]->getFeatures();
+
+    // loop through each inherited parent class
+    for (Symbol parent: parents_list) {
+      Class_ parent_class = class_list[parent];
+      auto parent_features = parent_class->getFeatures();
+
+      //loop through all methods in the inherited class
+      for (int i = parent_features->first(); parent_features->more(i); i = parent_features->next(i)) {
+
+
+        //loop through all methods in this class
+        for (int i = my_features->first(); my_features->more(i); i = my_features->next(i)) {
+          // check if we are looking at an attribute or a method
+          // if looking at attribute then only have to compare name and types?
+          // if looking at method have to compare name, parameter number, parameter types, and return types
+          // shld offload method comparison to different function imo
+          // if equal Semant error 
+        }
+      }
+
+    }
   }
 }
 
