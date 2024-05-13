@@ -7,6 +7,8 @@
 #include "utilities.h"
 #include <iostream>
 #include <vector>
+#include <unordered_set>
+
 
 extern int semant_debug;
 extern char *curr_filename;
@@ -199,6 +201,19 @@ void ClassTable::add_methods(Classes classes) {
         }
         else {
           curr_class_method_list[method_name] = curr_method;
+          std::unordered_set<Symbol> formal_check;
+          Formals formal_list = curr_method->getFormals();
+          for (int j = formal_list->first(); formal_list->more(j); j = formal_list->next(j)) {
+            auto curr_formal = formal_list->nth(j);
+            auto formal_name = curr_formal->getName();
+            if (formal_check.find(formal_name) != formal_check.end()) {
+              semant_error(curr_class);
+              error_stream << "Formal parameter " << formal_name << " is multiply defined."<< endl;
+            }
+            else {
+              formal_check.insert(formal_name);
+            }
+          }
         }
       }
       else {
@@ -253,32 +268,34 @@ void ClassTable::create_inheritance (Classes classes) {
 // function to make sure methods and attributes are okay with inheritance
 void ClassTable::check_features_inheritance() {
   // loop through all of the "class: list of parent class" entries
-  for (auto& name_parents_list: inheritance_map_class) {
-    std::vector<Symbol> parents_list = name_parents_list.second;
-    curr_name = name_parents_list.first;
-    auto my_features = class_list[curr_name]->getFeatures();
+  //ADDED THIS TO RUN THE CODE PLEASE REMOVE
+  return;
+  // for (auto& name_parents_list: inheritance_map_class) {
+  //   std::vector<Symbol> parents_list = name_parents_list.second;
+  //   curr_name = name_parents_list.first;
+  //   auto my_features = class_list[curr_name]->getFeatures();
 
-    // loop through each inherited parent class
-    for (Symbol parent: parents_list) {
-      Class_ parent_class = class_list[parent];
-      auto parent_features = parent_class->getFeatures();
+  //   // loop through each inherited parent class
+  //   for (Symbol parent: parents_list) {
+  //     Class_ parent_class = class_list[parent];
+  //     auto parent_features = parent_class->getFeatures();
 
-      //loop through all methods in the inherited class
-      for (int i = parent_features->first(); parent_features->more(i); i = parent_features->next(i)) {
+  //     //loop through all methods in the inherited class
+  //     for (int i = parent_features->first(); parent_features->more(i); i = parent_features->next(i)) {
 
 
-        //loop through all methods in this class
-        for (int i = my_features->first(); my_features->more(i); i = my_features->next(i)) {
-          // check if we are looking at an attribute or a method
-          // if looking at attribute then only have to compare name and types?
-          // if looking at method have to compare name, parameter number, parameter types, and return types
-          // shld offload method comparison to different function imo
-          // if equal Semant error 
-        }
-      }
+  //       //loop through all methods in this class
+  //       for (int i = my_features->first(); my_features->more(i); i = my_features->next(i)) {
+  //         // check if we are looking at an attribute or a method
+  //         // if looking at attribute then only have to compare name and types?
+  //         // if looking at method have to compare name, parameter number, parameter types, and return types
+  //         // shld offload method comparison to different function imo
+  //         // if equal Semant error 
+  //       }
+  //     }
 
-    }
-  }
+  //   }
+  // }
 }
 
 void ClassTable::install_basic_classes() {
