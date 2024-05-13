@@ -86,13 +86,31 @@ static void initialize_constants(void) {
   val         = idtable.add_string("_val");
 }
 
+void ClassTable::exit_func() {
+  if (this->errors()) {
+      cerr << "Compilation halted due to static semantic errors." << endl;
+      exit(1);
+   }
+}
+
+
 ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   /* Fill this in */
   install_basic_classes();
+  exit_func();
   add_classes_check_duplicates (classes);
+  exit_func();
   check_inheritance();
+  exit_func();
   check_acyclic();
+  exit_func();
+  check_main();
+  exit_func();
+  add_methods(classes);
+  exit_func();
 }
+
+
 
 void ClassTable::add_classes_check_duplicates(Classes classes) {
   for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
@@ -101,6 +119,7 @@ void ClassTable::add_classes_check_duplicates(Classes classes) {
     if (class_list.count(curr_name) > 0) {
       // double check this error msg
       semant_error(curr_class);
+      error_stream << "Class " << curr_name << " was previously defined." << endl;
     }
     class_list[curr_name] = curr_class;
   }
@@ -112,7 +131,10 @@ void ClassTable::check_inheritance() {
     Class_ curr_class = name_class.second;
 
     if (curr_class->getParent() != No_class && class_list.count(curr_class->getParent()) == 0)
+    {
       semant_error(curr_class);
+      error_stream << "Class " << curr_name << " inherits from an undefined class " << curr_class->getParent() << "." << endl;
+    }
   }
 }
 
@@ -126,6 +148,7 @@ void ClassTable::check_acyclic() {
 void ClassTable::check_cycle_for_class(Class_& curr_class, std::set<Symbol>& visited) {
   if (visited.find(curr_class->getParent()) != visited.end()) {
     semant_error(curr_class);
+    error_stream << "Class " << curr_class->getName() << ", or an ancestor of " << curr_class->getName() << ", is involved in an inheritance cycle." << endl;
     return;
   }
   visited.insert(curr_class->getName());
@@ -133,6 +156,65 @@ void ClassTable::check_cycle_for_class(Class_& curr_class, std::set<Symbol>& vis
   // following if should always be true
   if (class_list.count(curr_class->getParent()) != 0)
     check_cycle_for_class (class_list[curr_class->getParent()], visited);
+}
+
+void ClassTable::check_main() {
+  // Check if class Main is defined
+  if (class_list.count(Main) == 0) {
+    semant_error();
+    error_stream << "Class Main is not defined. " << endl;
+    return;
+  }
+  // check if main function is defined in class Main 
+  auto main_class = class_list[Main];
+  auto feature_list = main_class->getFeatures();
+  for (int i = feature_list->first(); feature_list->more(i); i = feature_list->next(i)) {
+    //cout << "name is " << (static_cast<method_class*>(feature_list->nth(i)))->getName() << endl;
+    if ( (static_cast<method_class*>(feature_list->nth(i)))->getName() == main_meth){
+      return;
+    }
+  }
+  semant_error(main_class);  
+  error_stream << "No 'main' method in class Main." << endl;
+}
+
+void ClassTable::add_methods(Classes classes) {
+
+  for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
+    Class_ curr_class = classes->nth(i);
+    Symbol class_name = curr_class->getName();
+    std::map <Symbol, method_class*> curr_class_method_list;
+    std::map <Symbol, attr_class*> curr_class_attr_list;
+    auto method_list = curr_class->getFeatures();
+    for (int i = method_list->first(); method_list->more(i); i = method_list->next(i)) {
+      // auto curr_method = (static_cast<method_class*>(method_list->nth(i)));
+      // auto method_name = curr_method->getName();
+      if ((method_list->nth(i))->diff()) {
+        auto curr_method = (static_cast<method_class*>(method_list->nth(i)));
+        auto method_name = curr_method->getName();
+        if (curr_class_method_list.count(method_name) != 0) {
+          semant_error(curr_class);
+          error_stream << "Method " << method_name << " is multiply defined."<< endl;
+        }
+        else {
+          curr_class_method_list[method_name] = curr_method;
+        }
+      }
+      else {
+        auto curr_attr = (static_cast<attr_class*>(method_list->nth(i)));
+        auto attr_name = curr_attr->getName();
+        if (curr_class_attr_list.count(attr_name) != 0) {
+          semant_error(curr_class);
+          error_stream << "Attribute " << attr_name << " is multiply defined in class."<< endl;
+        }
+        else {
+          curr_class_attr_list[attr_name] = curr_attr;
+        }
+      }
+    }
+    all_method_list[class_name] = curr_class_method_list;
+    all_attr_list[class_name] = curr_class_attr_list;
+  }
 }
 
 void ClassTable::install_basic_classes() {

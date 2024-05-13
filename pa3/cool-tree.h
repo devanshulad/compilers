@@ -52,6 +52,11 @@ class Feature_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
+   // virtual Symbol getName () = 0;
+   // virtual Formals getFormals () = 0;
+   // virtual Symbol getReturnType () = 0;
+   // virtual Expression getExpr () = 0;
+   virtual bool diff () = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -195,6 +200,11 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+   Symbol getName () {return name; };
+   Formals getFormals () { return formals; };
+   Symbol getReturnType () { return return_type; };
+   Expression getExpr () { return expr; };
+   bool diff () {return true; };
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -219,6 +229,11 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+   bool diff () {return false; };
+   Symbol getName () {return name; };
+   Symbol typeDecl () {return type_decl; };
+   Expression getInit () {return init; };
+
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS

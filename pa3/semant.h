@@ -28,10 +28,15 @@ private:
   void install_basic_classes();
   std::ostream& error_stream;
   std::map <Symbol, Class_> class_list;
+  std::map <Symbol, std::map <Symbol, method_class*>> all_method_list;
+  std::map <Symbol, std::map <Symbol, attr_class*>> all_attr_list;
   void add_classes_check_duplicates(Classes classes);
   void check_inheritance ();
   void check_acyclic ();
   void check_cycle_for_class (Class_& curr_class, std::set<Symbol>& visited);
+  void check_main ();
+  void exit_func ();
+  void add_methods(Classes classes);
 
 
 
