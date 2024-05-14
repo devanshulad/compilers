@@ -43,7 +43,8 @@ private:
   void add_methods(Classes classes);
   void create_inheritance (Classes classes);
   void check_features_inheritance ();
-
+  void ancestor_method_check (Class_ curr_class, method_class* curr, method_class* parent);
+  
 
 
 public:
@@ -52,7 +53,7 @@ public:
   std::ostream& semant_error();
   std::ostream& semant_error(Class_ c);
   std::ostream& semant_error(Symbol filename, tree_node *t);
-
+  std::ostream& semant_error (Class_ c, int line_no);
 };
 
 

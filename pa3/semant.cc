@@ -110,9 +110,9 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   check_main();
   exit_func();
   add_methods(classes);
-  exit_func();
   create_inheritance (classes);
   check_features_inheritance ();
+  exit_func();
 }
 
 void ClassTable::add_classes_check_duplicates(Classes classes) {
@@ -192,11 +192,11 @@ void ClassTable::add_methods(Classes classes) {
     for (int i = method_list->first(); method_list->more(i); i = method_list->next(i)) {
       // auto curr_method = (static_cast<method_class*>(method_list->nth(i)));
       // auto method_name = curr_method->getName();
-      if ((method_list->nth(i))->diff()) {
-        auto curr_method = (static_cast<method_class*>(method_list->nth(i)));
-        auto method_name = curr_method->getName();
+      if ((method_list->nth(i))->isMethod()) {
+        method_class* curr_method = (static_cast<method_class*>(method_list->nth(i)));
+        Symbol method_name = curr_method->getName();
         if (curr_class_method_list.count(method_name) != 0) {
-          semant_error(curr_class);
+          semant_error(curr_class, curr_method->get_line_number());
           error_stream << "Method " << method_name << " is multiply defined."<< endl;
         }
         else {
@@ -205,9 +205,9 @@ void ClassTable::add_methods(Classes classes) {
           Formals formal_list = curr_method->getFormals();
           for (int j = formal_list->first(); formal_list->more(j); j = formal_list->next(j)) {
             auto curr_formal = formal_list->nth(j);
-            auto formal_name = curr_formal->getName();
+            Symbol formal_name = curr_formal->getName();
             if (formal_check.find(formal_name) != formal_check.end()) {
-              semant_error(curr_class);
+              semant_error(curr_class, curr_formal->get_line_number());
               error_stream << "Formal parameter " << formal_name << " is multiply defined."<< endl;
             }
             else {
@@ -217,10 +217,10 @@ void ClassTable::add_methods(Classes classes) {
         }
       }
       else {
-        auto curr_attr = (static_cast<attr_class*>(method_list->nth(i)));
-        auto attr_name = curr_attr->getName();
+        attr_class* curr_attr = (static_cast<attr_class*>(method_list->nth(i)));
+        Symbol attr_name = curr_attr->getName();
         if (curr_class_attr_list.count(attr_name) != 0) {
-          semant_error(curr_class);
+          semant_error(curr_class, curr_attr->get_line_number());
           error_stream << "Attribute " << attr_name << " is multiply defined in class."<< endl;
         }
         else {
@@ -268,34 +268,90 @@ void ClassTable::create_inheritance (Classes classes) {
 // function to make sure methods and attributes are okay with inheritance
 void ClassTable::check_features_inheritance() {
   // loop through all of the "class: list of parent class" entries
-  //ADDED THIS TO RUN THE CODE PLEASE REMOVE
-  return;
-  // for (auto& name_parents_list: inheritance_map_class) {
-  //   std::vector<Symbol> parents_list = name_parents_list.second;
-  //   curr_name = name_parents_list.first;
-  //   auto my_features = class_list[curr_name]->getFeatures();
+  for (auto& name_parents_list: inheritance_map_class) {
+    std::vector<Symbol> parents_list = name_parents_list.second;
+    Symbol curr_name = name_parents_list.first;
+    Class_ curr_class = class_list[curr_name];
+    auto my_features = curr_class->getFeatures();
 
-  //   // loop through each inherited parent class
-  //   for (Symbol parent: parents_list) {
-  //     Class_ parent_class = class_list[parent];
-  //     auto parent_features = parent_class->getFeatures();
+    // loop through each inherited parent class
+    for (Symbol parent: parents_list) {
+      Class_ parent_class = class_list[parent];
+      auto parent_features = parent_class->getFeatures();
 
-  //     //loop through all methods in the inherited class
-  //     for (int i = parent_features->first(); parent_features->more(i); i = parent_features->next(i)) {
+      //loop through all features in the inherited class
+      for (int i = parent_features->first(); parent_features->more(i); i = parent_features->next(i)) {
+        
+        //loop through all features in this class
+        for (int j = my_features->first(); my_features->more(j); j = my_features->next(j)) {
+          // check if we are looking at an attribute or a method
+          // if looking at attribute then only have to compare name and types?
+          // if looking at method have to compare name, parameter number, parameter types, and return types
+          // shld offload method comparison to different function imo
+          // if equal Semant error 
+          if ((my_features->nth(j))->isMethod()) {
+            if ((parent_features->nth(i))->isMethod()) {
+              method_class* curr_method = (static_cast<method_class*>(my_features->nth(j)));
+              method_class* par_method = (static_cast<method_class*>(parent_features->nth(i)));
+              if (curr_method->getName() == par_method->getName()) {
+                ancestor_method_check(curr_class, curr_method, par_method);
+              }
+            } 
+          } else {
+            if (!((parent_features->nth(i))->isMethod())) {
+              attr_class* curr_attr = (static_cast<attr_class*>(my_features->nth(j)));
+              attr_class* par_attr = (static_cast<attr_class*>(parent_features->nth(i)));
+              if (curr_attr->getName() == par_attr->getName()) {
+                semant_error(curr_class, curr_attr->get_line_number());
+                error_stream << "Attribute " << curr_attr->getName() << " is an attribute of an inherited class."<< endl;
+              }
+            }
+          }
 
+        }
+      }
 
-  //       //loop through all methods in this class
-  //       for (int i = my_features->first(); my_features->more(i); i = my_features->next(i)) {
-  //         // check if we are looking at an attribute or a method
-  //         // if looking at attribute then only have to compare name and types?
-  //         // if looking at method have to compare name, parameter number, parameter types, and return types
-  //         // shld offload method comparison to different function imo
-  //         // if equal Semant error 
-  //       }
-  //     }
+    }
+  }
+}
 
-  //   }
-  // }
+void ClassTable::ancestor_method_check (Class_ curr_class, method_class* curr, method_class* parent) {
+  if (curr->getReturnType() != parent->getReturnType()) {
+      semant_error(curr_class, curr->get_line_number());
+      error_stream << "In redefined method " << curr->getName() << ", return type " << curr->getReturnType() 
+                   << " is different from original return type " << parent->getReturnType() << "." << endl;
+  }
+  
+  std::vector<Symbol> child_list; 
+  std::vector<Symbol> parent_list; 
+  
+  Formals child_formals = curr->getFormals();
+  for (int i = child_formals->first(); child_formals->more(i); i = child_formals->next(i)) {
+    Symbol curr_type = child_formals->nth(i)->typeDecl();
+    child_list.push_back(curr_type);
+  }
+  Formals parent_formals = parent->getFormals();
+  for (int i = parent_formals->first(); parent_formals->more(i); i = parent_formals->next(i)) {
+    Symbol curr_type = parent_formals->nth(i)->typeDecl();
+    parent_list.push_back(curr_type);
+  }
+
+  if (child_list.size() != parent_list.size()) {
+    semant_error(curr_class, curr->get_line_number());
+    error_stream << "Incompatible number of formal parameters in redefined method " << curr->getName() << endl;
+    return;
+  }
+
+  if (child_list != parent_list) {
+    for (int j = 0; j < int(child_list.size()); j++) {
+      if (child_list[j] != parent_list[j]) {
+        semant_error(curr_class, curr->get_line_number());
+        error_stream << "In redefined method " << curr->getName() << ", parameter type " 
+                     << child_list[j] << " is different from original type " << parent_list[j] << endl;
+        return;
+      }
+    }
+  }
 }
 
 void ClassTable::install_basic_classes() {
@@ -443,6 +499,10 @@ ostream& ClassTable::semant_error()
     return error_stream;
 }
 
+ostream& ClassTable::semant_error (Class_ c, int line_no) {
+  error_stream <<c->get_filename()  << ":" << line_no << ": ";
+  return semant_error();
+}
 
 /*
  * This is the entry point to the semantic checker.
@@ -460,12 +520,6 @@ ostream& ClassTable::semant_error()
  */
 void program_class::semant() {
    initialize_constants();
-   //cout << "HIIIIIIIIIII\n\n" << endl;
-  //  cout << classes << endl;
-  // for(int i = classes->first(); classes->more(i); i = classes->next(i))
-  // {
-  //   cout << classes->nth(i)->dump(cout)<< " hi " << endl;
-  // }
 
     /* ClassTable constructor may do some semantic analysis */
    ClassTableP classtable = new ClassTable(classes);
