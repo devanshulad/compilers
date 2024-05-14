@@ -113,6 +113,15 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   create_inheritance (classes);
   check_features_inheritance ();
   exit_func();
+
+  for (auto& pair: all_attr_list) {
+    for (auto& pair2: pair.second) {
+
+      std::cout << "Class: " << pair.first << " Attribute: " << pair2.first << std::endl;
+      std::cout << "Type: " << pair2.second->typeDecl() << std::endl;
+      std::cout << "Init: " << pair2.second->getInit()->returnType() << std::endl;
+    }
+  }
 }
 
 void ClassTable::add_classes_check_duplicates(Classes classes) {
@@ -528,4 +537,170 @@ void program_class::semant() {
       cerr << "Compilation halted due to static semantic errors." << endl;
       exit(1);
    }
+}
+
+Symbol assign_class::returnType() {
+  return Int;
+}
+
+Symbol static_dispatch_class::returnType() {
+  return Int;
+}
+
+Symbol dispatch_class::returnType() {
+  return Int;
+}
+
+Symbol cond_class::returnType() {
+  Symbol first_type = pred->returnType();
+  Symbol second_type = then_exp->returnType();
+  Symbol third_type = else_exp->returnType();
+  if (first_type != Bool) {
+    // print error here
+  }
+  // need to find common ancestor and return that, need to also see how we will handel none_type because else can be none type 
+  return Bool;
+}
+
+Symbol loop_class::returnType() {
+  if (pred->returnType() != Bool) {
+    // print error here
+  }
+  return Object;
+}
+
+Symbol typcase_class::returnType() {
+  return Int;
+}
+
+Symbol block_class::returnType() {
+  return Int;
+}
+
+Symbol let_class::returnType() {
+  return Int;
+}
+
+Symbol plus_class::returnType() {
+  //return Int;
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;
+}
+
+Symbol sub_class::returnType() {
+  //return Int;
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;
+}
+
+Symbol mul_class::returnType() {
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;
+} 
+
+Symbol divide_class::returnType() {
+  // return Int;
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;
+} 
+
+Symbol neg_class::returnType() {
+  return Int;
+  Symbol first_type = e1->returnType();
+  if (first_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;
+}
+
+Symbol lt_class::returnType() {
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;
+}
+
+Symbol eq_class::returnType() {
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();}
+  if (first_type == Int || first_type == Str || first_type == Bool second_type == Int || 
+    second_type == Str || second_type == Bool) {
+      if (first_type != second_type) {
+        // write error here
+        return Object;
+      }
+  return Bool;
+  }
+
+Symbol leq_class::returnType() {
+  Symbol first_type = e1->returnType();
+  Symbol second_type = e2->returnType();
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    return Object;
+  }
+  return Int;} 
+
+Symbol comp_class::returnType() {
+  set_type(Bool);
+  return Bool;
+}
+
+Symbol int_const_class::returnType() {
+  set_type(Int);
+  return Int;
+}
+
+Symbol bool_const_class::returnType() {
+  return Bool;
+}
+
+Symbol string_const_class::returnType() {
+  return Str;
+}
+
+Symbol new__class::returnType() {
+  if (type_name == SELF_TYPE) {
+    return SELF_TYPE;
+  }
+  // might need to check if type_name is defined in symbol table or not
+  return type_name->returnType();
+}
+
+Symbol isvoid_class::returnType() {
+  return Bool;
+  // i think this is correct
+}
+
+Symbol no_expr_class::returnType() {
+  return No_type;
+  // should also be correct ?
+}
+
+Symbol object_class::returnType() {
+  return Int;
 }
