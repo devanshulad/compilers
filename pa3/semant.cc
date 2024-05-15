@@ -589,6 +589,7 @@ Symbol plus_class::returnType() {
     //need to print error here, maybe need to get curr class ?
     return Object;
   }
+  set_type(Int);
   return Int;
 }
 
@@ -646,15 +647,15 @@ Symbol lt_class::returnType() {
 
 Symbol eq_class::returnType() {
   Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();}
-  if (first_type == Int || first_type == Str || first_type == Bool second_type == Int || 
-    second_type == Str || second_type == Bool) {
+  Symbol second_type = e2->returnType();
+  if (first_type == Int || first_type == Str || first_type == Bool || second_type == Int || second_type == Str || second_type == Bool) {
       if (first_type != second_type) {
         // write error here
         return Object;
       }
-  return Bool;
   }
+  return Bool;
+}
 
 Symbol leq_class::returnType() {
   Symbol first_type = e1->returnType();
@@ -688,7 +689,8 @@ Symbol new__class::returnType() {
     return SELF_TYPE;
   }
   // might need to check if type_name is defined in symbol table or not
-  return type_name->returnType();
+  // i think ?
+  return type_name;
 }
 
 Symbol isvoid_class::returnType() {
