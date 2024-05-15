@@ -14,6 +14,13 @@ extern int semant_debug;
 extern char *curr_filename;
 extern int node_lineno;
 
+std::map <Symbol, Class_> class_list;
+std::map <Symbol, std::map <Symbol, method_class*>> all_method_list;
+std::map <Symbol, std::map <Symbol, attr_class*>> all_attr_list;
+std::map <Symbol, std::vector<Symbol>> inheritance_map_class;
+std::map <Symbol, SymbolTable<Symbol, Symbol>*> sym_table;
+ClassTableP classtable;
+
 //////////////////////////////////////////////////////////////////////
 //
 // Symbols
@@ -113,7 +120,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   create_inheritance (classes);
   check_features_inheritance ();
   exit_func();
-  check_all_classes();
+  check_all_classes(classes);
   // for (auto& pair: all_attr_list) {
   //   for (auto& pair2: pair.second) {
 
@@ -561,9 +568,11 @@ ostream& ClassTable::semant_error (Class_ c, int line_no) {
  *   to build mycoolc.
  */
 
-Symbol ClassTable::find_common_ancestor(Symbol class1, Symbol class2) {
+Symbol find_common_ancestor(Symbol class1, Symbol class2) {
   std::vector<Symbol> class1_ancestors = inheritance_map_class[class1];
+  class1_ancestors.insert(class1_ancestors.begin(), class1);
   std::vector<Symbol> class2_ancestors = inheritance_map_class[class2];
+  class2_ancestors.insert(class2_ancestors.begin(), class2);
   for (Symbol ancestor1: class1_ancestors) {
     for (Symbol ancestor2: class2_ancestors) {
       if (ancestor1 == ancestor2) {
@@ -574,54 +583,79 @@ Symbol ClassTable::find_common_ancestor(Symbol class1, Symbol class2) {
   return Object;
 }
 
-void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>& curr_sym_table) {
+void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>* curr_sym_table) {
   Symbol class_name = c->getName();
-  curr_sym_table.enterscope();
   //curr_sym_table.addid(self, &class_name); // check this
   Features features = c->getFeatures();
+  int j = 0;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (features->nth(i)->isMethod()) {
       //method_class* curr_method = (static_cast<method_class*>(features->nth(i)));
       //curr_sym_table.addid(curr_method->getName(), &curr_method->getReturnType());
     }
     else {
+      if (j == 0) {
+        curr_sym_table->enterscope();
+      }
+      j+=1;
       attr_class* curr_attr = (static_cast<attr_class*>(features->nth(i)));
-      Entry* entry = static_cast<Entry*>(curr_attr->typeDecl());
-      curr_sym_table.addid(curr_attr->getName(), &entry);
+      Symbol entry = static_cast<Symbol>(curr_attr->typeDecl());
+      // cout << "before coming to c" << endl;
+      Symbol type = curr_attr->getInit()->returnType(c);
+      // cout << "after coming to c" << endl;
+      if (find_common_ancestor(curr_attr->typeDecl(), type) != curr_attr->typeDecl()) {
+        // cout << "ERROR HERE    " << find_common_ancestor(curr_attr->typeDecl(), type)  << endl;
+        // print error here
+      } else {
+        // cout << "ADDING TO SYM TABLE      " << curr_attr->getName() << entry <<endl;
+        curr_sym_table->addid(curr_attr->getName(), &entry);
+        // cout << "ADDED" << endl;
+        // curr_sym_table->dump();
+      }
     }
   }
+  // curr_sym_table->dump();
 }
 
 void ClassTable::print_sym_table() {
   for (auto& entry : sym_table) {
     Symbol class_name = entry.first;
-    SymbolTable<Symbol, Symbol> sym_table_class = entry.second;
+    SymbolTable<Symbol, Symbol>* sym_table_class = entry.second;
 
-    std::cout << "Class: " << class_name;
+    // std::cout << "Class: " << class_name;
 
-    sym_table_class.dump();
+    // sym_table_class.dump();
 
-    std::cout << std::endl;
+    // std::cout << std::endl;
   }
 }
 
 void ClassTable::make_sym_table_class(Symbol c) {
   std::vector<Symbol> ancestors = inheritance_map_class[c];
-  SymbolTable<Symbol, Symbol> curr_sym_table;
+  SymbolTable<Symbol, Symbol>* curr_sym_table = new SymbolTable<Symbol, Symbol>();
   
   for (int i = ancestors.size() - 1; i >= 0; i--) {
+    // cout << "  * making inheritance for class " << ancestors[i] << endl;
     make_sym_table_class_helper(class_list[ancestors[i]], curr_sym_table);
+    sym_table[c] = curr_sym_table;
   }
+  // cout << "  * making symtable for current class " << c << endl;
+  // curr_sym_table->dump();
   make_sym_table_class_helper(class_list[c], curr_sym_table);
+  // curr_sym_table->addid(Symbol("d"), new Symbol(Bool));
   sym_table[c] = curr_sym_table;
+
   
 }
 
-void ClassTable::check_all_classes() {
-  for (auto& name_class: class_list) {
-    Class_ curr_class = name_class.second;
+void ClassTable::check_all_classes(Classes classes) {
+  // for (auto& name_class: classes) {
+  for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
+    Class_ curr_class = classes->nth(i);
+    // cout << "  *** start for class " << curr_class->getName() << endl;
 
-    make_sym_table_class(name_class.first);
+    make_sym_table_class(curr_class->getName());
+    // cout << "  *** done for class " << curr_class->getName() << endl;
   }
 }
 
@@ -638,32 +672,42 @@ void program_class::semant() {
    }
 }
 
-Symbol assign_class::returnType() {
-  Symbol name = name;
-  Expression expr = expr;
+Symbol assign_class::returnType(Class_ C) {
+  Symbol type = *sym_table[C->getName()]->lookup(name);
+  if (type == NULL) {
+    // print error here
+    // C->semant_error(C);
+  }
 
-  sym_table[Object].lookup(name) != NULL;
+  // one of expr's parent has to be type
+  Symbol expr_type = expr->returnType(C);
+  // cout << "REACHING expr->returnType(C)" << endl;
+
+  if (find_common_ancestor(expr_type, type) != type) {
+    // print error here
+    // C-semant_error(C);
+  }
 
   // check if name is in symbol table
   // evaluate type of expr
   // see if type of expr is a subclass of type of name
   // if so return type of expr, else error.
+  set_type(expr_type);
+  return expr_type;
+}
 
+Symbol static_dispatch_class::returnType(Class_ C) {
   return Int;
 }
 
-Symbol static_dispatch_class::returnType() {
+Symbol dispatch_class::returnType(Class_ C) {
   return Int;
 }
 
-Symbol dispatch_class::returnType() {
-  return Int;
-}
-
-Symbol cond_class::returnType() {
-  Symbol first_type = pred->returnType();
-  Symbol second_type = then_exp->returnType();
-  Symbol third_type = else_exp->returnType();
+Symbol cond_class::returnType(Class_ C) {
+  Symbol first_type = pred->returnType(C);
+  Symbol second_type = then_exp->returnType(C);
+  Symbol third_type = else_exp->returnType(C);
   if (first_type != Bool) {
     // print error here
   }
@@ -671,31 +715,51 @@ Symbol cond_class::returnType() {
   return Bool;
 }
 
-Symbol loop_class::returnType() {
-  if (pred->returnType() != Bool) {
+Symbol loop_class::returnType(Class_ C) {
+  if (pred->returnType(C) != Bool) {
     // print error here
   }
   set_type(Object);
   return Object;
 }
 
-Symbol typcase_class::returnType() {
+Symbol typcase_class::returnType(Class_ C) {
   return Int;
 }
 
-Symbol block_class::returnType() {
+Symbol block_class::returnType(Class_ C) {
   return Int;
 }
 
-Symbol let_class::returnType() {
+Symbol let_class::returnType(Class_ C) {
   //need to complete 
   return Int;
 }
 
-Symbol plus_class::returnType() {
+Symbol plus_class::returnType(Class_ C) {
   //return Int;
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
+  // cout << "started plus" << endl;
+  
+  Symbol second_type = e2->returnType(C);
+  // cout << " second type is " << second_type << endl;
+  Symbol first_type = e1->returnType(C);
+    // cout << "first type is " << first_type << endl;
+  if (first_type != Int || second_type != Int) {
+    //need to print error here, maybe need to get curr class ?
+    cerr << "Non integer argument" << endl;
+    // classtable->semant_error(C);
+    set_type(Object);
+    return Object;
+  }
+  set_type(Int);
+  // cout << "ended plus" << endl;
+  return Int;
+}
+
+Symbol sub_class::returnType(Class_ C) {
+  //return Int;
+  Symbol first_type = e1->returnType(C);
+  Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
     //need to print error here, maybe need to get curr class ?
     set_type(Object);
@@ -705,22 +769,9 @@ Symbol plus_class::returnType() {
   return Int;
 }
 
-Symbol sub_class::returnType() {
-  //return Int;
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
-  if (first_type != Int || second_type != Int) {
-    //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
-  }
-  set_type(Int);
-  return Int;
-}
-
-Symbol mul_class::returnType() {
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
+Symbol mul_class::returnType(Class_ C) {
+  Symbol first_type = e1->returnType(C);
+  Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
     //need to print error here, maybe need to get curr class ?
     set_type(Object);
@@ -730,10 +781,10 @@ Symbol mul_class::returnType() {
   return Int;
 } 
 
-Symbol divide_class::returnType() {
+Symbol divide_class::returnType(Class_ C) {
   // return Int;
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
+  Symbol first_type = e1->returnType(C);
+  Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
     //need to print error here, maybe need to get curr class ?
     set_type(Object);
@@ -743,9 +794,9 @@ Symbol divide_class::returnType() {
   return Int;
 } 
 
-Symbol neg_class::returnType() {
+Symbol neg_class::returnType(Class_ C) {
   return Int;
-  Symbol first_type = e1->returnType();
+  Symbol first_type = e1->returnType(C);
   if (first_type != Int) {
     //need to print error here, maybe need to get curr class ?
     set_type(Object);
@@ -755,9 +806,9 @@ Symbol neg_class::returnType() {
   return Int;
 }
 
-Symbol lt_class::returnType() {
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
+Symbol lt_class::returnType(Class_ C) {
+  Symbol first_type = e1->returnType(C);
+  Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
     //need to print error here, maybe need to get curr class ?
     set_type(Object);
@@ -767,9 +818,9 @@ Symbol lt_class::returnType() {
   return Int;
 }
 
-Symbol eq_class::returnType() {
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
+Symbol eq_class::returnType(Class_ C) {
+  Symbol first_type = e1->returnType(C);
+  Symbol second_type = e2->returnType(C);
   if (first_type == Int || first_type == Str || first_type == Bool || second_type == Int || second_type == Str || second_type == Bool) {
       if (first_type != second_type) {
         // write error here
@@ -781,9 +832,9 @@ Symbol eq_class::returnType() {
   return Bool;
 }
 
-Symbol leq_class::returnType() {
-  Symbol first_type = e1->returnType();
-  Symbol second_type = e2->returnType();
+Symbol leq_class::returnType(Class_ C) {
+  Symbol first_type = e1->returnType(C);
+  Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
     //need to print error here, maybe need to get curr class ?
     set_type(Object);
@@ -793,27 +844,28 @@ Symbol leq_class::returnType() {
   return Int;
 } 
 
-Symbol comp_class::returnType() {
+Symbol comp_class::returnType(Class_ C) {
   set_type(Bool);
   return Bool;
 }
 
-Symbol int_const_class::returnType() {
+Symbol int_const_class::returnType(Class_ C) {
+  // cout << "Reached INT CONST CLASS " << endl;
   set_type(Int);
   return Int;
 }
 
-Symbol bool_const_class::returnType() {
+Symbol bool_const_class::returnType(Class_ C) {
   set_type(Bool);
   return Bool;
 }
 
-Symbol string_const_class::returnType() {
+Symbol string_const_class::returnType(Class_ C) {
   set_type(Str);
   return Str;
 }
 
-Symbol new__class::returnType() {
+Symbol new__class::returnType(Class_ C) {
   if (type_name == SELF_TYPE) {
     set_type(SELF_TYPE);
     return SELF_TYPE;
@@ -824,19 +876,39 @@ Symbol new__class::returnType() {
   return type_name;
 }
 
-Symbol isvoid_class::returnType() {
+Symbol isvoid_class::returnType(Class_ C) {
   set_type(Bool);
   return Bool;
   // i think this is correct
 }
 
-Symbol no_expr_class::returnType() {
+Symbol no_expr_class::returnType(Class_ C) {
   set_type(No_type);
   return No_type;
   // should also be correct ?
 }
 
-Symbol object_class::returnType() {
+Symbol object_class::returnType(Class_ C) {
   // not complete need to change it 
-  return Int;
+  // cout << "begin func "<< C->getName()<< "\t" <<name <<endl;
+  // cout << "hii" << endl;
+  // sym_table[C->getName()]->dump();
+  // cout << "hii" << endl;
+  Symbol *type = sym_table[C->getName()]->lookup(name);
+  
+  // cout << "hello  "<< type << endl;
+  if (type == NULL) {
+    // cout << name << "is null "<< endl;
+    cout << "hi" << endl;
+    classtable->error_stream << "Undeclared identifier " << name << "." <<endl;
+    // classtable->semant_error(C);
+    set_type(Object);
+    // cout << "hi" << endl;
+    return Object;
+  }
+  set_type(*type);
+  // cout << "end func "<< endl;
+  // cerr << "Testing" << endl;
+  // classtable->semant_error(C);
+  return *type;
 }

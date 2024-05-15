@@ -57,6 +57,7 @@ public:
    // virtual Symbol getReturnType () = 0;
    // virtual Expression getExpr () = 0;
    virtual bool isMethod () = 0;
+   virtual Symbol returnType(Class_) = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -87,7 +88,7 @@ class Expression_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Expression(); }
    virtual Expression copy_Expression() = 0;
-   virtual Symbol returnType() = 0;
+   virtual Symbol returnType(Class_) = 0;
 
 #ifdef Expression_EXTRAS
    Expression_EXTRAS
@@ -208,6 +209,7 @@ public:
    Symbol getReturnType () { return return_type; };
    Expression getExpr () { return expr; };
    bool isMethod () {return true; };
+   Symbol returnType(Class_) { return return_type; }
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -236,7 +238,7 @@ public:
    Symbol getName () {return name; };
    Symbol typeDecl () {return type_decl; };
    Expression getInit () {return init; };
-
+   Symbol returnType(Class_) { return type_decl; }
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -307,7 +309,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -334,7 +336,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -359,7 +361,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -385,7 +387,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -409,7 +411,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -433,7 +435,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -455,7 +457,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -483,7 +485,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -507,7 +509,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -531,7 +533,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -555,7 +557,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -578,7 +580,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -599,7 +601,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -622,7 +624,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -645,7 +647,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -668,7 +670,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -689,7 +691,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -710,7 +712,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -731,7 +733,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
@@ -752,7 +754,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -774,7 +776,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -796,7 +798,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -816,7 +818,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 
 #ifdef Expression_SHARED_EXTRAS
@@ -827,8 +829,6 @@ public:
 #endif
 };
 
-
-// define constructor - object
 class object_class : public Expression_class {
 protected:
    Symbol name;
@@ -838,7 +838,7 @@ public:
    }
    Expression copy_Expression();
    void dump(ostream& stream, int n);
-   Symbol returnType();
+   Symbol returnType(Class_);
 
 #ifdef Expression_SHARED_EXTRAS
    Expression_SHARED_EXTRAS
