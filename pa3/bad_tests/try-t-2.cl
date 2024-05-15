@@ -9,15 +9,10 @@ Class A {
 };
 
 Class B inherits A {
-    b : Int <- 5;
+    b : Bool <- true;
 };
 
 Class C inherits B {
-    c : Int <- d + 5; 
-};
-
-Class D inherits B {
-    e: Object;
-    f: Object;
-    c : Int <- ed + fd + true;
+    c : Int <- b + 5; 
+    d : Int <- c + b + a;
 };

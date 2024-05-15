@@ -47,9 +47,9 @@ private:
   void check_all_classes(Classes );
   void make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>* curr_sym_table);
 
-
 public:
   ClassTable(Classes);
+  void run(Classes);
   int errors() { return semant_errors; }
   std::ostream& semant_error();
   std::ostream& semant_error(Class_ c);

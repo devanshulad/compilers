@@ -107,6 +107,9 @@ void ClassTable::exit_func() {
 ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
   /* Fill this in */
   install_basic_classes();
+}
+
+void ClassTable::run(Classes classes) {
   exit_func();
   add_classes_check_duplicates (classes);
   exit_func();
@@ -530,7 +533,6 @@ void ClassTable::install_basic_classes() {
 //       (line number is extracted from tree_node)
 //
 ///////////////////////////////////////////////////////////////////
-
 ostream& ClassTable::semant_error(Class_ c)
 {
   return semant_error(c->get_filename(),c);
@@ -664,7 +666,8 @@ void program_class::semant() {
    initialize_constants();
 
     /* ClassTable constructor may do some semantic analysis */
-   ClassTableP classtable = new ClassTable(classes);
+   classtable = new ClassTable(classes);
+   classtable->run(classes);
 
    if (classtable->errors()) {
       cerr << "Compilation halted due to static semantic errors." << endl;
@@ -739,15 +742,31 @@ Symbol let_class::returnType(Class_ C) {
 Symbol plus_class::returnType(Class_ C) {
   //return Int;
   // cout << "started plus" << endl;
-  
-  Symbol second_type = e2->returnType(C);
-  // cout << " second type is " << second_type << endl;
+  int initial_num_errors = classtable->errors();
   Symbol first_type = e1->returnType(C);
-    // cout << "first type is " << first_type << endl;
+  int errors_after_first = classtable->errors();
+  Symbol second_type = e2->returnType(C);
+  int errors_after_second = classtable->errors();
+  bool first_errors = (errors_after_first != initial_num_errors);
+  bool second_errors = (errors_after_second != errors_after_first);
+
   if (first_type != Int || second_type != Int) {
+     classtable->semant_error(C, this->get_line_number());
+      classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
     //need to print error here, maybe need to get curr class ?
-    cerr << "Non integer argument" << endl;
-    // classtable->semant_error(C);
+    // cerr << "Non integer argument" << endl;
+    // if (!first_errors && !second_errors) {
+    //   classtable->semant_error(C, this->get_line_number());
+    //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
+    // }
+    // if (!first_errors && second_errors && ) {
+    //   classtable->semant_error(C, this->get_line_number());
+    //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
+    // }
+    // if (!first_errors && second_errors && first_type != Int) {
+    //   classtable->semant_error(C, this->get_line_number());
+    //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
+    // }
     set_type(Object);
     return Object;
   }
@@ -890,18 +909,18 @@ Symbol no_expr_class::returnType(Class_ C) {
 
 Symbol object_class::returnType(Class_ C) {
   // not complete need to change it 
-  // cout << "begin func "<< C->getName()<< "\t" <<name <<endl;
+  // cout << "begin obj class in class "<< C->getName()<< ", where name is " <<name <<endl;
   // cout << "hii" << endl;
   // sym_table[C->getName()]->dump();
   // cout << "hii" << endl;
   Symbol *type = sym_table[C->getName()]->lookup(name);
   
-  // cout << "hello  "<< type << endl;
+  // cout << "hello  "<< *type << endl;
   if (type == NULL) {
     // cout << name << "is null "<< endl;
-    cout << "hi" << endl;
+    // cout << "hi" << endl;
+    classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "Undeclared identifier " << name << "." <<endl;
-    // classtable->semant_error(C);
     set_type(Object);
     // cout << "hi" << endl;
     return Object;
