@@ -45,7 +45,7 @@ private:
   void print_sym_table();
   void make_sym_table_class(Symbol c);
   void check_all_classes(Classes );
-  void make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>* curr_sym_table);
+  void make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>*& curr_sym_table);
 
 public:
   ClassTable(Classes);

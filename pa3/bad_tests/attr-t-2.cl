@@ -5,6 +5,16 @@ Class Main {
 };
 
 Class A {
-    b : Int <- a + 5;
-    a : Int <- 4;
+    d : Bool <- true;
+    c : Int <- 5 + 5;
+};
+
+Class B inherits A {
+    b : Int <- 5;
+    z : Int <- y;
+    y : Int <- 2;
+};
+
+Class C inherits B {
+    e : Int <- 12 + 5; 
 };

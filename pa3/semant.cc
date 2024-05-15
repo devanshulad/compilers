@@ -585,11 +585,12 @@ Symbol find_common_ancestor(Symbol class1, Symbol class2) {
   return Object;
 }
 
-void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>* curr_sym_table) {
+void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>*& curr_sym_table) {
   Symbol class_name = c->getName();
   //curr_sym_table.addid(self, &class_name); // check this
   Features features = c->getFeatures();
   int j = 0;
+  Symbol d = NULL;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (features->nth(i)->isMethod()) {
       //method_class* curr_method = (static_cast<method_class*>(features->nth(i)));
@@ -599,16 +600,27 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
       if (j == 0) {
         curr_sym_table->enterscope();
       }
-      j+=1;
       attr_class* curr_attr = (static_cast<attr_class*>(features->nth(i)));
       Symbol entry = static_cast<Symbol>(curr_attr->typeDecl());
-      curr_sym_table->addid(curr_attr->getName(), &entry);
+      if (j == 0) {
+        d =  curr_attr->getName();
+        // cout << "trying   " << d << endl;
+      }
+      j+=1;
+      // cout << "line 605 " << curr_attr->getName() << "\t" << curr_attr->typeDecl() << endl;
+      curr_sym_table->addid(curr_attr->getName(), new Symbol(curr_attr->typeDecl()));
+      // cout << "line 611 " << curr_attr->getName() << "\t" << entry << endl;
+      // cout << "byeee " << *curr_sym_table->lookup(d) << endl;
     }
   }
+  if (d != NULL) {
+    // cout << "BLAHH  " << *curr_sym_table->lookup(d) << endl;
+  }
   sym_table[c->getName()] = curr_sym_table;
+  // curr_sym_table->dump();
   
-  for (int i = features->first(); features->more(i); i = features->next(i)) {
-    if (features->nth(i)->isMethod()) {
+  for (int k = features->first(); features->more(k); k = features->next(k)) {
+    if (features->nth(k)->isMethod()) {
       //method_class* curr_method = (static_cast<method_class*>(features->nth(i)));
       //curr_sym_table.addid(curr_method->getName(), &curr_method->getReturnType());
     }
@@ -617,20 +629,27 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
       //   curr_sym_table->enterscope();
       // }
       // j+=1;
-      attr_class* curr_attr = (static_cast<attr_class*>(features->nth(i)));
+      attr_class* curr_attr = (static_cast<attr_class*>(features->nth(k)));
       Symbol entry = static_cast<Symbol>(curr_attr->typeDecl());
       // cout << "before coming to c" << endl;
+      // cout << "line 632 " << curr_attr->getName() << "\t" << curr_attr->typeDecl() << endl;
+      // cout << "HII  " << *curr_sym_table->lookup(d) << endl;
       Symbol type = curr_attr->getInit()->returnType(c);
-      // cout << "after coming to c" << endl;
+      // cout << "symbol type = " << type << endl;
+
       if (find_common_ancestor(curr_attr->typeDecl(), type) != curr_attr->typeDecl()) {
-        // cout << "ERROR HERE    " << find_common_ancestor(curr_attr->typeDecl(), type)  << endl;
+        //cout << "ERROR HERE    " << find_common_ancestor(curr_attr->typeDecl(), type)  << endl;
+         semant_error(c, c->get_line_number());
+         error_stream << "Inferred type " << type << " of initialization of attribute " << curr_attr-> getName() 
+         << " does nor conform to declared type " << curr_attr->typeDecl() << "." <<endl;
+
         // print error here
-      } else {
+      } //else {
         // cout << "ADDING TO SYM TABLE      " << curr_attr->getName() << entry <<endl;
-        curr_sym_table->addid(curr_attr->getName(), &entry);
+        //curr_sym_table->addid(curr_attr->getName(), &entry);
         // cout << "ADDED" << endl;
         // curr_sym_table->dump();
-      }
+      //}
     }
   }
   // curr_sym_table->dump();
@@ -656,13 +675,12 @@ void ClassTable::make_sym_table_class(Symbol c) {
   for (int i = ancestors.size() - 1; i >= 0; i--) {
     // cout << "  * making inheritance for class " << ancestors[i] << endl;
     make_sym_table_class_helper(class_list[ancestors[i]], curr_sym_table);
-    sym_table[c] = curr_sym_table;
+    // sym_table[c] = curr_sym_table;
   }
   // cout << "  * making symtable for current class " << c << endl;
   // curr_sym_table->dump();
   make_sym_table_class_helper(class_list[c], curr_sym_table);
-  // curr_sym_table->addid(Symbol("d"), new Symbol(Bool));
-  sym_table[c] = curr_sym_table;
+  // sym_table[c] = curr_sym_table;
 
   
 }
@@ -672,7 +690,6 @@ void ClassTable::check_all_classes(Classes classes) {
   for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
     Class_ curr_class = classes->nth(i);
     // cout << "  *** start for class " << curr_class->getName() << endl;
-
     make_sym_table_class(curr_class->getName());
     // cout << "  *** done for class " << curr_class->getName() << endl;
   }
@@ -757,38 +774,18 @@ Symbol let_class::returnType(Class_ C) {
 }
 
 Symbol plus_class::returnType(Class_ C) {
-  //return Int;
-  // cout << "started plus" << endl;
-  int initial_num_errors = classtable->errors();
+  // cout << "plus " << e2->name << endl;
   Symbol first_type = e1->returnType(C);
-  int errors_after_first = classtable->errors();
   Symbol second_type = e2->returnType(C);
-  int errors_after_second = classtable->errors();
-  bool first_errors = (errors_after_first != initial_num_errors);
-  bool second_errors = (errors_after_second != errors_after_first);
-
+  // cout<< "first_type  " << first_type << "second type  " << second_type << endl;
+  
   if (first_type != Int || second_type != Int) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
-    //need to print error here, maybe need to get curr class ?
-    // cerr << "Non integer argument" << endl;
-    // if (!first_errors && !second_errors) {
-    //   classtable->semant_error(C, this->get_line_number());
-    //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
-    // }
-    // if (!first_errors && second_errors && ) {
-    //   classtable->semant_error(C, this->get_line_number());
-    //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
-    // }
-    // if (!first_errors && second_errors && first_type != Int) {
-    //   classtable->semant_error(C, this->get_line_number());
-    //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
-    // }
     set_type(Int);
     return Int;
   }
   set_type(Int);
-  // cout << "ended plus" << endl;
   return Int;
 }
 
@@ -925,26 +922,15 @@ Symbol no_expr_class::returnType(Class_ C) {
 }
 
 Symbol object_class::returnType(Class_ C) {
-  // not complete need to change it 
-  // cout << "begin obj class in class "<< C->getName()<< ", where name is " <<name <<endl;
-  // cout << "hii" << endl;
-  // sym_table[C->getName()]->dump();
-  // cout << "hii" << endl;
   Symbol *type = sym_table[C->getName()]->lookup(name);
-  
-  // cout << "hello  "<< *type << endl;
+  // cout << "reached " << *type << name << endl;
+
   if (type == NULL) {
-    // cout << name << "is null "<< endl;
-    // cout << "hi" << endl;
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "Undeclared identifier " << name << "." <<endl;
     set_type(Object);
-    // cout << "hi" << endl;
     return Object;
   }
   set_type(*type);
-  // cout << "end func "<< endl;
-  // cerr << "Testing" << endl;
-  // classtable->semant_error(C);
   return *type;
 }
