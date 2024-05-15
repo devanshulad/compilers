@@ -639,6 +639,16 @@ void program_class::semant() {
 }
 
 Symbol assign_class::returnType() {
+  Symbol name = name;
+  Expression expr = expr;
+
+  sym_table[Object].lookup(name) != NULL;
+
+  // check if name is in symbol table
+  // evaluate type of expr
+  // see if type of expr is a subclass of type of name
+  // if so return type of expr, else error.
+
   return Int;
 }
 
