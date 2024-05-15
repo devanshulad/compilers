@@ -17,7 +17,6 @@ Class C inherits B {
 };
 
 Class D inherits B {
-    e: Object;
-    f: Object;
-    c : Int <- ed + fd + true;
+    c : Int <- true + true;
+    d : Int <- c + 5;
 };

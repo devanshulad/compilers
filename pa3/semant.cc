@@ -602,6 +602,23 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
       j+=1;
       attr_class* curr_attr = (static_cast<attr_class*>(features->nth(i)));
       Symbol entry = static_cast<Symbol>(curr_attr->typeDecl());
+      curr_sym_table->addid(curr_attr->getName(), &entry);
+    }
+  }
+  sym_table[c->getName()] = curr_sym_table;
+  
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    if (features->nth(i)->isMethod()) {
+      //method_class* curr_method = (static_cast<method_class*>(features->nth(i)));
+      //curr_sym_table.addid(curr_method->getName(), &curr_method->getReturnType());
+    }
+    else {
+      // if (j == 0) {
+      //   curr_sym_table->enterscope();
+      // }
+      // j+=1;
+      attr_class* curr_attr = (static_cast<attr_class*>(features->nth(i)));
+      Symbol entry = static_cast<Symbol>(curr_attr->typeDecl());
       // cout << "before coming to c" << endl;
       Symbol type = curr_attr->getInit()->returnType(c);
       // cout << "after coming to c" << endl;
@@ -751,8 +768,8 @@ Symbol plus_class::returnType(Class_ C) {
   bool second_errors = (errors_after_second != errors_after_first);
 
   if (first_type != Int || second_type != Int) {
-     classtable->semant_error(C, this->get_line_number());
-      classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
     //need to print error here, maybe need to get curr class ?
     // cerr << "Non integer argument" << endl;
     // if (!first_errors && !second_errors) {
@@ -767,8 +784,8 @@ Symbol plus_class::returnType(Class_ C) {
     //   classtable->semant_error(C, this->get_line_number());
     //   classtable->error_stream << "non-Int arguments: " << first_type << " + " << second_type << endl;
     // }
-    set_type(Object);
-    return Object;
+    set_type(Int);
+    return Int;
   }
   set_type(Int);
   // cout << "ended plus" << endl;
