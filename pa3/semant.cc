@@ -112,7 +112,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
 void ClassTable::run(Classes classes) {
   exit_func();
   add_classes_check_duplicates (classes);
-  exit_func();
+  // exit_func();
   check_inheritance();
   exit_func();
   check_acyclic();
@@ -133,7 +133,7 @@ void ClassTable::run(Classes classes) {
   //   }
   // }
 
-  print_sym_table();
+  // print_sym_table();
 
 // std::vector<Symbol> classes_reordered = reorder_classes();
 //   cout << "Reordered Classes: ";
@@ -145,10 +145,15 @@ void ClassTable::run(Classes classes) {
 }
 
 void ClassTable::add_classes_check_duplicates(Classes classes) {
+  std::set<Symbol> bad_classes = {Int, Str, Bool, IO, SELF_TYPE};
   for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
     Class_ curr_class = classes->nth(i);
     Symbol curr_name = curr_class->getName();
-    if (class_list.count(curr_name) > 0) {
+    if (bad_classes.find(curr_name) != bad_classes.end()) {
+      semant_error(curr_class);
+      error_stream << " Redefinition of basic class " << curr_name << "." << endl;
+    }
+    else if (class_list.count(curr_name) > 0) {
       // double check this error msg
       semant_error(curr_class);
       error_stream << "Class " << curr_name << " was previously defined." << endl;
@@ -158,11 +163,17 @@ void ClassTable::add_classes_check_duplicates(Classes classes) {
 }
 
 void ClassTable::check_inheritance() {
+  std::set<Symbol> bad_classes = {SELF_TYPE, Int, Str, Bool};
   for (auto& name_class: class_list) {
     Symbol curr_name = name_class.first;
     Class_ curr_class = name_class.second;
 
-    if (curr_class->getParent() != No_class && class_list.count(curr_class->getParent()) == 0)
+    if (bad_classes.find(curr_class->getParent()) != bad_classes.end()) {
+      semant_error(curr_class);
+      error_stream << "Class " << curr_name << " cannot inherit class " << curr_class->getParent() << "." << endl;
+    }
+
+    else if(curr_class->getParent() != No_class && class_list.count(curr_class->getParent()) == 0)
     {
       semant_error(curr_class);
       error_stream << "Class " << curr_name << " inherits from an undefined class " << curr_class->getParent() << "." << endl;
@@ -219,8 +230,6 @@ void ClassTable::add_methods(Classes classes) {
     std::map <Symbol, attr_class*> curr_class_attr_list;
     auto method_list = curr_class->getFeatures();
     for (int i = method_list->first(); method_list->more(i); i = method_list->next(i)) {
-      // auto curr_method = (static_cast<method_class*>(method_list->nth(i)));
-      // auto method_name = curr_method->getName();
       if ((method_list->nth(i))->isMethod()) {
         method_class* curr_method = (static_cast<method_class*>(method_list->nth(i)));
         Symbol method_name = curr_method->getName();
