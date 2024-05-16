@@ -585,24 +585,33 @@ Symbol find_common_ancestor(Symbol class1, Symbol class2) {
   return Object;
 }
 
-void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>*& curr_sym_table) {
+void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>*& curr_sym_table, bool isAncestor) {
   Symbol class_name = c->getName();
   //curr_sym_table.addid(self, &class_name); // check this
   Features features = c->getFeatures();
   int j = 0;
   Symbol d = NULL;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
-    if (features->nth(i)->isMethod()) {
-      // method_clas* curr_method = all_method_list[c][features->nth(i)->getName()];
-      // curr_sym_table->enterscope();
-      // Formals formal_list = curr_method->getFormals();
-      // for (int j = formal_list->first(); formal_list->more(j); j = formal_list->next(j)) {
-      //     auto curr_formal = formal_list->nth(j);
-      //     Symbol formal_name = curr_formal->getName();
-      //     curr_sym_table->addid(formal_name, new Symbol(curr_formal->typeDecl()));
-      // }
+    if (features->nth(i)->isMethod() && class_name != Symbol(Object)) { // is method
+      method_class* curr_method = static_cast<method_class *>(features->nth(i));
+      curr_sym_table->enterscope();
+      Formals formal_list = curr_method->getFormals();
+      //cout << "line 556 " << curr_method->getName() << "\t" << curr_method->getReturnType() << endl;
+      for (int j = formal_list->first(); formal_list->more(j); j = formal_list->next(j)) {
+          auto curr_formal = formal_list->nth(j);
+          Symbol formal_name = curr_formal->getName();
+          curr_sym_table->addid(formal_name, new Symbol(curr_formal->typeDecl()));
+      }
+      // cout << "Before error " << endl;
+      sym_table[c->getName()] = curr_sym_table;
+      Symbol method_return_type = curr_method->getExpr()->returnType(c);
+      if (method_return_type != curr_method->getReturnType() && !isAncestor) {
+        semant_error(c, curr_method->get_line_number());
+        error_stream << "Inferred return type " << method_return_type << " of method " << curr_method->getName() << " does not conform to declared return type " << curr_method->getReturnType() << "." << endl;
+      }
+      curr_sym_table->exitscope();
     }
-    else {
+    else {  // is attribute
       if (j == 0) {
         curr_sym_table->enterscope();
       }
@@ -638,7 +647,7 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
 
       if (type != No_type)
       { 
-        if (find_common_ancestor(curr_attr->typeDecl(), type) != curr_attr->typeDecl()) {
+        if (find_common_ancestor(curr_attr->typeDecl(), type) != curr_attr->typeDecl() && !isAncestor) {
           semant_error(c, curr_attr->get_line_number());
           error_stream << "Inferred type " << type << " of initialization of attribute " << curr_attr-> getName() 
           << " does nor conform to declared type " << curr_attr->typeDecl() << "." <<endl;
@@ -668,12 +677,12 @@ void ClassTable::make_sym_table_class(Symbol c) {
   
   for (int i = ancestors.size() - 1; i >= 0; i--) {
     // cout << "  * making inheritance for class " << ancestors[i] << endl;
-    make_sym_table_class_helper(class_list[ancestors[i]], curr_sym_table);
+    make_sym_table_class_helper(class_list[ancestors[i]], curr_sym_table, true);
     // sym_table[c] = curr_sym_table;
   }
   // cout << "  * making symtable for current class " << c << endl;
   // curr_sym_table->dump();
-  make_sym_table_class_helper(class_list[c], curr_sym_table);
+  make_sym_table_class_helper(class_list[c], curr_sym_table, false);
   // sym_table[c] = curr_sym_table;
 
   
@@ -683,6 +692,7 @@ void ClassTable::check_all_classes(Classes classes) {
   // for (auto& name_class: classes) {
   for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
     Class_ curr_class = classes->nth(i);
+
     // cout << "  *** start for class " << curr_class->getName() << endl;
     make_sym_table_class(curr_class->getName());
     // cout << "  *** done for class " << curr_class->getName() << endl;
@@ -727,12 +737,77 @@ Symbol assign_class::returnType(Class_ C) {
   return expr_type;
 }
 
-Symbol static_dispatch_class::returnType(Class_ C) {
-  return Int;
+void check_all_formals(Class_ C, method_class* method, Expressions actual, int lineno) {
+  Formals formal_list = method->getFormals();
+  if (formal_list->len() != actual->len()) {
+    classtable->semant_error(C, lineno);
+    classtable->error_stream << "Method " << method->getName() << " called with wrong number of arguments." << endl;
+    return;
+  }
+  for (int i = formal_list->first(); formal_list->more(i); i = formal_list->next(i)) {
+    Symbol formal_type = formal_list->nth(i)->typeDecl();
+    Symbol actual_type = actual->nth(i)->returnType(C);
+    if (find_common_ancestor(formal_type, actual_type) != formal_type) {
+      classtable->semant_error(C, lineno);
+      classtable->error_stream << "In call of method " << method->getName() << ", type " << actual_type << " of parameter " << formal_list->nth(i)->getName() << " does not conform to declared type " << formal_type << "." << endl;
+    }
+  }
 }
 
+method_class* check_and_return_method(Symbol expr_type, Symbol name) {
+  if (all_method_list[expr_type].count(name) != 0) {
+    // cout << "Found method in class" << expr_type << endl;
+    return all_method_list[expr_type][name];
+  }
+  std::vector<Symbol> parent_list = inheritance_map_class[expr_type];
+  for (Symbol parent: parent_list) {
+    if (all_method_list[parent].count(name) != 0) {
+      // cout << "Found method in parent class" << parent << endl;
+      return all_method_list[parent][name];
+    }
+  }
+  return NULL;
+}
+
+//  Expression expr;  -- e0
+//    Symbol type_name;  -- class name of object
+//    Symbol name; -- method name
+//    Expressions actual; -- e1, e2, e3...
+Symbol static_dispatch_class::returnType(Class_ C) {
+  Symbol expr_type = expr->returnType(C);
+  if (find_common_ancestor(expr_type, type_name) != type_name) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Expression type " << expr_type << " does not conform to declared static dispatch type " << type_name << "." << endl;
+    return Object;
+  }
+  method_class* method = check_and_return_method(type_name, name);
+  if (method == NULL) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Static dispatch to undefined method " << name << "." << endl;
+    return Object;
+  }
+  check_all_formals(C, method, actual, this->get_line_number());
+  set_type(method->getReturnType());
+  return method->getReturnType();
+}
+
+
+  //  Expression expr;
+  //  Symbol name;
+  //  Expressions actual;
 Symbol dispatch_class::returnType(Class_ C) {
-  return Int;
+  Symbol expr_type = expr->returnType(C);
+  // TODO: do we need to check if expr_type is no expr?
+  // if (expr_type == no_expr())
+  method_class* method = check_and_return_method(expr_type, name);
+  if (method == NULL) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Dispatch to undefined method " << name << "." << endl;
+    return Object;
+  }
+  check_all_formals(C, method, actual, this->get_line_number());
+  set_type(method->getReturnType());
+  return method->getReturnType();
 }
 
 Symbol cond_class::returnType(Class_ C) {
@@ -811,7 +886,11 @@ Symbol block_class::returnType(Class_ C) {
 
 Symbol let_class::returnType(Class_ C) {
   //need to complete 
+  // cout << "Start of let \t " << C->getName() <<  endl;
+  // sym_table[C->getName()]->dump();
   sym_table[C->getName()]->enterscope();
+  // cout << "After enterscope " << endl;
+  // cout << "Before if check " << endl;
   Symbol init_type = init->returnType(C);
   sym_table[C->getName()]->addid(identifier, new Symbol(type_decl));
   if (init_type != No_type && find_common_ancestor(init_type, type_decl) != type_decl) {
@@ -825,7 +904,7 @@ Symbol let_class::returnType(Class_ C) {
   
   Symbol ret_type = body->returnType(C);
   set_type(ret_type);
-
+  // cout << "END OF LET " << endl;
   sym_table[C->getName()]->exitscope();
   
   return ret_type;
@@ -881,27 +960,25 @@ Symbol divide_class::returnType(Class_ C) {
 } 
 
 Symbol neg_class::returnType(Class_ C) {
-  return Int;
   Symbol first_type = e1->returnType(C);
   if (first_type != Int) {
     //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Argument of '~' has type " << first_type << " instead of Int." << endl;
   }
   set_type(Int);
   return Int;
 }
-
+// TODO: FIX THESE BELOW
 Symbol lt_class::returnType(Class_ C) {
   Symbol first_type = e1->returnType(C);
   Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
-    //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "non-Int arguments: " << first_type << " < " << second_type << endl;
   }
-  set_type(Int);
-  return Int;
+  set_type(Bool);
+  return Bool;
 }
 
 Symbol eq_class::returnType(Class_ C) {
@@ -909,9 +986,8 @@ Symbol eq_class::returnType(Class_ C) {
   Symbol second_type = e2->returnType(C);
   if (first_type == Int || first_type == Str || first_type == Bool || second_type == Int || second_type == Str || second_type == Bool) {
       if (first_type != second_type) {
-        // write error here
-        set_type(Object);
-        return Object;
+        classtable->semant_error(C, this->get_line_number());
+        classtable->error_stream << "Illegal comparisons with a basic type." << endl;
       }
   }
   set_type(Bool);
@@ -922,12 +998,11 @@ Symbol leq_class::returnType(Class_ C) {
   Symbol first_type = e1->returnType(C);
   Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
-    //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "non-Int arguments: " << first_type << " <= " << second_type << endl;
   }
-  set_type(Int);
-  return Int;
+  set_type(Bool);
+  return Bool;
 } 
 
 Symbol comp_class::returnType(Class_ C) {

@@ -4112,3 +4112,48 @@ label193:
 	lw	$ra 4($sp)
 	addiu	$sp $sp 36
 	jr	$ra	
+Class Main {
+    main(): Int {
+        42
+    };
+};
+
+Class A {
+    func(): String {
+        "Hello, World!"
+    };
+
+    func2(): Bool {
+        true
+    };
+};
+
+Class B inherits A {
+    func3(): Object {
+        self
+    };
+
+    func4(): Int {
+        10 + 5
+    };
+};
+
+Class C {
+    func5(): C {
+        new C
+    };
+
+    func6(): String {
+        "COOL Programming Language"
+    };
+};
+
+Class D inherits C {
+    func7(): Bool {
+        false
+    };
+
+    func8(): Object {
+        self
+    };
+};
