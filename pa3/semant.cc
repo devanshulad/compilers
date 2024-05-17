@@ -110,20 +110,21 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
 }
 
 void ClassTable::run(Classes classes) {
-  exit_func();
+  // exit_func();
   add_classes_check_duplicates (classes);
   // exit_func();
   check_inheritance();
-  exit_func();
+  // exit_func();
   check_acyclic();
-  exit_func();
+  // exit_func();
   check_main();
-  exit_func();
+  // exit_func();
   add_methods(classes);
   create_inheritance (classes);
   check_features_inheritance ();
-  exit_func();
+  // exit_func();
   check_all_classes(classes);
+  exit_func();
   // for (auto& pair: all_attr_list) {
   //   for (auto& pair2: pair.second) {
 
@@ -223,8 +224,10 @@ void ClassTable::check_main() {
 
 void ClassTable::add_methods(Classes classes) {
 
-  for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
-    Class_ curr_class = classes->nth(i);
+  // for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
+  for (auto& name_class: class_list) {
+    Class_ curr_class = name_class.second; 
+    // Class_ curr_class = classes->nth(i);
     Symbol class_name = curr_class->getName();
     std::map <Symbol, method_class*> curr_class_method_list;
     std::map <Symbol, attr_class*> curr_class_attr_list;
@@ -244,6 +247,15 @@ void ClassTable::add_methods(Classes classes) {
           for (int j = formal_list->first(); formal_list->more(j); j = formal_list->next(j)) {
             auto curr_formal = formal_list->nth(j);
             Symbol formal_name = curr_formal->getName();
+            if (formal_name == self) {
+              semant_error(curr_class, curr_formal->get_line_number());
+              error_stream << "'self' cannot be the name of a formal parameter." << endl;
+            }
+            if (curr_formal->typeDecl() == SELF_TYPE) {
+              semant_error(curr_class, curr_formal->get_line_number());
+              error_stream << "Formal parameter " << formal_name << " cannot have type SELF_TYPE."<< endl;
+            }
+            
             if (formal_check.find(formal_name) != formal_check.end()) {
               semant_error(curr_class, curr_formal->get_line_number());
               error_stream << "Formal parameter " << formal_name << " is multiply defined."<< endl;
@@ -257,6 +269,10 @@ void ClassTable::add_methods(Classes classes) {
       else {
         attr_class* curr_attr = (static_cast<attr_class*>(method_list->nth(i)));
         Symbol attr_name = curr_attr->getName();
+        if (attr_name == self) {
+          semant_error(curr_class, curr_attr->get_line_number());
+          error_stream << "'self' cannot be the name of an attribute." << endl;
+        }
         if (curr_class_attr_list.count(attr_name) != 0) {
           semant_error(curr_class, curr_attr->get_line_number());
           error_stream << "Attribute " << attr_name << " is multiply defined in class."<< endl;
@@ -579,7 +595,16 @@ ostream& ClassTable::semant_error (Class_ c, int line_no) {
  *   to build mycoolc.
  */
 
-Symbol find_common_ancestor(Symbol class1, Symbol class2) {
+Symbol find_common_ancestor(Symbol class1, Symbol class2, Class_ c) {
+  if (class1 == SELF_TYPE && class2 == SELF_TYPE) {
+    return SELF_TYPE;
+  }
+  if (class1 == SELF_TYPE) {
+    class1 = c->getName();
+  }
+  if (class2 == SELF_TYPE) {
+    class2 = c->getName();
+  }
   std::vector<Symbol> class1_ancestors = inheritance_map_class[class1];
   class1_ancestors.insert(class1_ancestors.begin(), class1);
   std::vector<Symbol> class2_ancestors = inheritance_map_class[class2];
@@ -614,7 +639,7 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
       // cout << "Before error " << endl;
       sym_table[c->getName()] = curr_sym_table;
       Symbol method_return_type = curr_method->getExpr()->returnType(c);
-      if (method_return_type != curr_method->getReturnType() && !isAncestor) {
+      if (find_common_ancestor(method_return_type, curr_method->getReturnType(), c) != curr_method->getReturnType() && !isAncestor) {
         semant_error(c, curr_method->get_line_number());
         error_stream << "Inferred return type " << method_return_type << " of method " << curr_method->getName() << " does not conform to declared return type " << curr_method->getReturnType() << "." << endl;
       }
@@ -623,6 +648,8 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
     else {  // is attribute
       if (j == 0) {
         curr_sym_table->enterscope();
+        curr_sym_table->addid(self, new Symbol(SELF_TYPE));
+        sym_table[c->getName()] = curr_sym_table;
       }
       attr_class* curr_attr = (static_cast<attr_class*>(features->nth(i)));
       Symbol entry = static_cast<Symbol>(curr_attr->typeDecl());
@@ -656,7 +683,7 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
 
       if (type != No_type)
       { 
-        if (find_common_ancestor(curr_attr->typeDecl(), type) != curr_attr->typeDecl() && !isAncestor) {
+        if (find_common_ancestor(curr_attr->typeDecl(), type, c) != curr_attr->typeDecl() && !isAncestor) {
           semant_error(c, curr_attr->get_line_number());
           error_stream << "Inferred type " << type << " of initialization of attribute " << curr_attr-> getName() 
           << " does nor conform to declared type " << curr_attr->typeDecl() << "." <<endl;
@@ -723,17 +750,30 @@ void program_class::semant() {
 }
 
 Symbol assign_class::returnType(Class_ C) {
-  Symbol type = *sym_table[C->getName()]->lookup(name);
+  Symbol curr_name = name;
+  if (name == self ) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Cannot assign to 'self'." << endl;
+    set_type(Object);
+    return Object;
+  }
+  Symbol *type = sym_table[C->getName()]->lookup(name);
   if (type == NULL) {
-    // print error here
-    // C->semant_error(C);
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Assignment to undeclared variable " << name << "." << endl;
+    set_type(Object);
+    return Object;
   }
 
   // one of expr's parent has to be type
   Symbol expr_type = expr->returnType(C);
   // cout << "REACHING expr->returnType(C)" << endl;
 
-  if (find_common_ancestor(expr_type, type) != type) {
+  if (find_common_ancestor(expr_type, *type, C) != *type) {
+    classtable->semant_error(C, this->get_line_number());
+    // classtable->error_stream << "let error: " << endl;
+    // Inferred type Bool of initialization of x does not conform to identifier's declared type Int.
+    classtable->error_stream << "Type " << expr_type << " of assigned expression does not conform to declared type " << *type << " of identifier " << name << "." <<endl;
     // print error here
     // C-semant_error(C);
   }
@@ -756,7 +796,7 @@ void check_all_formals(Class_ C, method_class* method, Expressions actual, int l
   for (int i = formal_list->first(); formal_list->more(i); i = formal_list->next(i)) {
     Symbol formal_type = formal_list->nth(i)->typeDecl();
     Symbol actual_type = actual->nth(i)->returnType(C);
-    if (find_common_ancestor(formal_type, actual_type) != formal_type) {
+    if (find_common_ancestor(formal_type, actual_type, C) != formal_type) {
       classtable->semant_error(C, lineno);
       classtable->error_stream << "In call of method " << method->getName() << ", type " << actual_type << " of parameter " << formal_list->nth(i)->getName() << " does not conform to declared type " << formal_type << "." << endl;
     }
@@ -784,7 +824,12 @@ method_class* check_and_return_method(Symbol expr_type, Symbol name) {
 //    Expressions actual; -- e1, e2, e3...
 Symbol static_dispatch_class::returnType(Class_ C) {
   Symbol expr_type = expr->returnType(C);
-  if (find_common_ancestor(expr_type, type_name) != type_name) {
+  if (type_name == SELF_TYPE) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Static dispatch to SELF_TYPE." << endl;
+    return Object;
+  }
+  if (find_common_ancestor(expr_type, type_name, C) != type_name) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "Expression type " << expr_type << " does not conform to declared static dispatch type " << type_name << "." << endl;
     return Object;
@@ -796,25 +841,40 @@ Symbol static_dispatch_class::returnType(Class_ C) {
     return Object;
   }
   check_all_formals(C, method, actual, this->get_line_number());
+
+  if (method->getReturnType() == SELF_TYPE) {
+    set_type(expr_type);
+    return expr_type;
+  }
   set_type(method->getReturnType());
   return method->getReturnType();
 }
 
 
-  //  Expression expr;
+  //  Expression  ;
   //  Symbol name;
   //  Expressions actual;
 Symbol dispatch_class::returnType(Class_ C) {
   Symbol expr_type = expr->returnType(C);
   // TODO: do we need to check if expr_type is no expr?
   // if (expr_type == no_expr())
+  if (expr_type == SELF_TYPE) {
+    expr_type = C->getName();
+  }
+  
   method_class* method = check_and_return_method(expr_type, name);
   if (method == NULL) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "Dispatch to undefined method " << name << "." << endl;
     return Object;
   }
+
   check_all_formals(C, method, actual, this->get_line_number());
+
+  if (method->getReturnType() == SELF_TYPE) {
+    set_type(expr_type);
+    return expr_type;
+  }
   set_type(method->getReturnType());
   return method->getReturnType();
 }
@@ -827,7 +887,7 @@ Symbol cond_class::returnType(Class_ C) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << " Predicate of 'if' does not have type Bool. " << endl;
   }
-  Symbol type = find_common_ancestor(second_type, third_type);
+  Symbol type = find_common_ancestor(second_type, third_type, C);
   // double check no error checking needed?
   set_type(type);
   return type;
@@ -862,7 +922,7 @@ Symbol typcase_class::returnType(Class_ C) {
     if (ret_type == No_type) {
       ret_type = branch_type;
     } else {
-      ret_type = find_common_ancestor(ret_type, branch_type);
+      ret_type = find_common_ancestor(ret_type, branch_type, C);
     }
   }
   // expr, cases
@@ -875,6 +935,15 @@ Symbol typcase_class::returnType(Class_ C) {
 
 Symbol branch_class::returnType(Class_ C) {
   sym_table[C->getName()]->enterscope();
+  if (name == self) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "'self' bound in 'case'." << endl;
+  }
+  if (type_decl == SELF_TYPE)
+  {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Identifier " << name << " declared with type SELF_TYPE in case branch." << endl;
+  }
   sym_table[C->getName()]->addid(name, new Symbol(type_decl));
   Symbol ret_type = expr->returnType(C);
   expr->set_type(ret_type);
@@ -895,14 +964,14 @@ Symbol block_class::returnType(Class_ C) {
 
 Symbol let_class::returnType(Class_ C) {
   //need to complete 
-  // cout << "Start of let \t " << C->getName() <<  endl;
-  // sym_table[C->getName()]->dump();
+  if (identifier == self) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "'self' cannot be bound in a 'let' expression." << endl;
+  }
   sym_table[C->getName()]->enterscope();
-  // cout << "After enterscope " << endl;
-  // cout << "Before if check " << endl;
   Symbol init_type = init->returnType(C);
   sym_table[C->getName()]->addid(identifier, new Symbol(type_decl));
-  if (init_type != No_type && find_common_ancestor(init_type, type_decl) != type_decl) {
+  if (init_type != No_type && find_common_ancestor(init_type, type_decl, C) != type_decl) {
     // print error here
     classtable->semant_error(C, this->get_line_number());
     // classtable->error_stream << "let error: " << endl;
@@ -935,9 +1004,8 @@ Symbol sub_class::returnType(Class_ C) {
   Symbol first_type = e1->returnType(C);
   Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
-    //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "non-Int arguments: " << first_type << " - " << second_type << endl;
   }
   set_type(Int);
   return Int;
@@ -947,22 +1015,19 @@ Symbol mul_class::returnType(Class_ C) {
   Symbol first_type = e1->returnType(C);
   Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
-    //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "non-Int arguments: " << first_type << " * " << second_type << endl;
   }
   set_type(Int);
   return Int;
 } 
 
 Symbol divide_class::returnType(Class_ C) {
-  // return Int;
   Symbol first_type = e1->returnType(C);
   Symbol second_type = e2->returnType(C);
   if (first_type != Int || second_type != Int) {
-    //need to print error here, maybe need to get curr class ?
-    set_type(Object);
-    return Object;
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "non-Int arguments: " << first_type << " / " << second_type << endl;
   }
   set_type(Int);
   return Int;

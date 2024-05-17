@@ -9,19 +9,19 @@ Class A {
     w: Int;
 
     h : Int <- 
-    let x : Int <- true, 
+    let x : Int <- self, 
     x: Bool <- x = 4
     in 
     w <- x + x;
 
     ab : Int <- 
-    let x : Int <- true, 
+    let self : Object <- true, 
     x: Bool <- y
     in 
     2;
 
     ac : Int <- 
-    let x : Int <- true, 
+    let x : SELF_TYPE <- true, 
     x: Bool <- y
     in 
     true;

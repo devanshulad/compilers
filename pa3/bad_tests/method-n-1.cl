@@ -11,7 +11,7 @@ Class A {
 };
 
 Class B inherits A {
-    func2(): B {
+    func2(self: Int, hello: SELF_TYPE): B {
         new A
     };
 };

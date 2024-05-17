@@ -2,9 +2,9 @@ class A {
     case_func (): Int {
         {
             hello <- 2;
-            case hello of
+            case self of
                 Bool : Int => 4 - 2;
-                Int : Int => A;
+                Int : Bool => A;
                 b : Bool => true;
             esac;
         }

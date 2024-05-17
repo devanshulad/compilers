@@ -1,11 +1,14 @@
 Class Main {
     main(): Int {
-        28
+        a <- 4
     };
 };
 
 Class A {
     a : Int <- 4;
+    func() : String {
+        a <- "hello"
+    };
 };
 
 Class B inherits A {
@@ -19,4 +22,6 @@ Class C inherits B {
 Class D inherits B {
     c : Int <- true + true;
     d : Int <- c + 5;
+    self: D <- new D;
+    h: Int <- new SELF_TYPE;
 };

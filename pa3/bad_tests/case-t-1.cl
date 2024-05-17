@@ -5,10 +5,10 @@ class Main {
 	};
 
     a : Object <- {
-        case 4 + 5 of 
-            x: Int => true;
-            y: Object => false;
-            z: String => false;
+        case self of 
+            x: SELF_TYPE => true;
+            self: Object => false;
+            y: String => self;
         esac;
     };
 };

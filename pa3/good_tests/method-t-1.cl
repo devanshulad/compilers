@@ -6,7 +6,6 @@ class A {
 };
 
 class B inherits A {
-    b: Bool;
     func (): Int {
         4
     };
