@@ -204,6 +204,10 @@ void ClassTable::add_methods(Classes classes) {
           semant_error(curr_class, curr_method->get_line_number());
           error_stream << "Method " << method_name << " is multiply defined."<< endl;
         }
+        if (class_list.find(curr_method->getReturnType()) == class_list.end() && curr_method->getReturnType() != SELF_TYPE) {
+          semant_error(curr_class, curr_method->get_line_number());
+          error_stream << "Undefined return type " << curr_method->getReturnType() << " in method " << method_name << "."<< endl;
+        }
         else {
           curr_class_method_list[method_name] = curr_method;
           std::unordered_set<Symbol> formal_check;
@@ -219,6 +223,10 @@ void ClassTable::add_methods(Classes classes) {
               semant_error(curr_class, curr_formal->get_line_number());
               error_stream << "Formal parameter " << formal_name << " cannot have type SELF_TYPE."<< endl;
             }
+            if (class_list.find(curr_formal->typeDecl()) == class_list.end()) {
+              semant_error(curr_class, curr_formal->get_line_number());
+              error_stream << "Class " << curr_formal->typeDecl()<< " of formal parameter " << formal_name << " is undefined." << endl;
+            }
             
             if (formal_check.find(formal_name) != formal_check.end()) {
               semant_error(curr_class, curr_formal->get_line_number());
@@ -233,9 +241,14 @@ void ClassTable::add_methods(Classes classes) {
       else {
         attr_class* curr_attr = (static_cast<attr_class*>(method_list->nth(i)));
         Symbol attr_name = curr_attr->getName();
+        std::set<Symbol> bad_classes = {SELF_TYPE, Int, Str, Bool, Object, IO, prim_slot};
         if (attr_name == self) {
           semant_error(curr_class, curr_attr->get_line_number());
           error_stream << "'self' cannot be the name of an attribute." << endl;
+        }
+        if (class_list.find(curr_attr->typeDecl()) == class_list.end() && bad_classes.find(curr_attr->typeDecl()) == bad_classes.end()) {
+          semant_error(curr_class, curr_attr->get_line_number());
+          error_stream << "Class " << curr_attr->typeDecl()<< " of attribute " << attr_name << " is undefined." << endl;
         }
         if (curr_class_attr_list.count(attr_name) != 0) {
           semant_error(curr_class, curr_attr->get_line_number());
@@ -611,6 +624,11 @@ Symbol static_dispatch_class::returnType(Class_ C) {
     classtable->error_stream << "Static dispatch to SELF_TYPE." << endl;
     return Object;
   }
+  if (class_list.find(type_name) == class_list.end()) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Static dispatch to undefined class " << type_name << "." << endl;
+    return Object;
+  }
   if (find_common_ancestor(expr_type, type_name, C) != type_name) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "Expression type " << expr_type << " does not conform to declared static dispatch type " << type_name << "." << endl;
@@ -657,7 +675,7 @@ Symbol cond_class::returnType(Class_ C) {
   Symbol third_type = else_exp->returnType(C);
   if (first_type != Bool) {
     classtable->semant_error(C, this->get_line_number());
-    classtable->error_stream << " Predicate of 'if' does not have type Bool. " << endl;
+    classtable->error_stream << "Predicate of 'if' does not have type Bool. " << endl;
   }
   Symbol type = find_common_ancestor(second_type, third_type, C);
   set_type(type);
@@ -707,6 +725,10 @@ Symbol branch_class::returnType(Class_ C) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "Identifier " << name << " declared with type SELF_TYPE in case branch." << endl;
   }
+  else if (class_list.find(type_decl) == class_list.end()) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Class " << type_decl << " of case branch is undefined." << endl;
+  }
   sym_table[C->getName()]->addid(name, new Symbol(type_decl));
   Symbol ret_type = expr->returnType(C);
   expr->set_type(ret_type);
@@ -727,6 +749,10 @@ Symbol let_class::returnType(Class_ C) {
   if (identifier == self) {
     classtable->semant_error(C, this->get_line_number());
     classtable->error_stream << "'self' cannot be bound in a 'let' expression." << endl;
+  }
+  if (class_list.find(type_decl) == class_list.end()) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Class " << type_decl << " of let-bound identifier " << identifier << " is undefined." << endl;
   }
   sym_table[C->getName()]->enterscope();
   Symbol init_type = init->returnType(C);
@@ -832,6 +858,10 @@ Symbol leq_class::returnType(Class_ C) {
 } 
 
 Symbol comp_class::returnType(Class_ C) {
+  if (e1->returnType(C) != Bool) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "Argument of 'not' has type " << e1->returnType(C) << " instead of Bool." << endl;
+  }
   set_type(Bool);
   return Bool;
 }
@@ -855,6 +885,12 @@ Symbol new__class::returnType(Class_ C) {
   if (type_name == SELF_TYPE) {
     set_type(SELF_TYPE);
     return SELF_TYPE;
+  }
+  if (class_list.find(type_name) == class_list.end()) {
+    classtable->semant_error(C, this->get_line_number());
+    classtable->error_stream << "'new' used with undefined class " << type_name << "." << endl;
+    set_type(Object);
+    return Object;
   }
   set_type(type_name);
   return type_name;
