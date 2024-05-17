@@ -28,8 +28,6 @@ class ClassTable : public SymbolTable<Symbol, InheritanceNode> {
 private:
   int semant_errors;           // counts the number of semantic errors
   void install_basic_classes();
-  
-
   void add_classes_check_duplicates(Classes classes);
   void check_inheritance ();
   void check_acyclic ();
@@ -40,9 +38,6 @@ private:
   void create_inheritance (Classes classes);
   void check_features_inheritance ();
   void ancestor_method_check (Class_ curr_class, method_class* curr, method_class* parent);
-  // Symbol find_common_ancestor (Symbol a, Symbol b);
-  // std::vector<Symbol> reorder_classes();
-  void print_sym_table();
   void make_sym_table_class(Symbol c);
   void check_all_classes(Classes );
   void make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbol>*& curr_sym_table, bool isAncestor);
