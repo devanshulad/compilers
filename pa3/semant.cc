@@ -640,11 +640,12 @@ void ClassTable::make_sym_table_class_helper(Class_ c, SymbolTable<Symbol, Symbo
       sym_table[c->getName()] = curr_sym_table;
       Symbol method_return_type = curr_method->getExpr()->returnType(c);
 
-      // if (method_return_type == SELF_TYPE) {
-      //   method_return_type = c->getName();
-      // }
+      Symbol defined_type = curr_method->getReturnType();
+      if (defined_type == SELF_TYPE) {
+        defined_type = c->getName();
+      }
 
-      if (find_common_ancestor(method_return_type, curr_method->getReturnType(), c) != curr_method->getReturnType() && !isAncestor) {
+      if (find_common_ancestor(method_return_type, defined_type, c) != defined_type && !isAncestor) {
         semant_error(c, curr_method->get_line_number());
         error_stream << "Inferred return type " << method_return_type << " of method " << curr_method->getName() << " does not conform to declared return type " << curr_method->getReturnType() << "." << endl;
       }
@@ -848,8 +849,8 @@ Symbol static_dispatch_class::returnType(Class_ C) {
   check_all_formals(C, method, actual, this->get_line_number());
 
   if (method->getReturnType() == SELF_TYPE) {
-    set_type(SELF_TYPE);
-    return SELF_TYPE;
+    set_type(expr->returnType(C));
+    return expr->returnType(C);
   }
   set_type(method->getReturnType());
   return method->getReturnType();
