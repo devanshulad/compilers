@@ -843,8 +843,8 @@ Symbol static_dispatch_class::returnType(Class_ C) {
   check_all_formals(C, method, actual, this->get_line_number());
 
   if (method->getReturnType() == SELF_TYPE) {
-    set_type(expr_type);
-    return expr_type;
+    set_type(SELF_TYPE);
+    return SELF_TYPE;
   }
   set_type(method->getReturnType());
   return method->getReturnType();
@@ -872,8 +872,8 @@ Symbol dispatch_class::returnType(Class_ C) {
   check_all_formals(C, method, actual, this->get_line_number());
 
   if (method->getReturnType() == SELF_TYPE) {
-    set_type(expr_type);
-    return expr_type;
+    set_type(SELF_TYPE);
+    return SELF_TYPE;
   }
   set_type(method->getReturnType());
   return method->getReturnType();
