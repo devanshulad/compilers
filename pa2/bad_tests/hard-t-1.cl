@@ -89,7 +89,7 @@ class AB {
         in 
         {
             hello <- 2;
-            case hello of
+            case self of
                 x : Int => 3 * 3;
                 y : Bool => true;
                 yz : Int => 4 - 2;
