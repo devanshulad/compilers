@@ -25,6 +25,7 @@
 #include "cgen.h"
 #include "cgen_supp.h"
 #include "handle_flags.h"
+#include <set>
 
 //
 // Two symbols from the semantic analyzer (semant.cc) are used.
@@ -393,7 +394,7 @@ void StringEntry::code_ref(ostream& s)
 void StringEntry::code_def(ostream& s, int stringclasstag)
 {
   IntEntryP lensym = inttable.add_int(len);
-
+  
   // Add -1 eye catcher
   s << WORD << "-1" << std::endl;
 
@@ -529,10 +530,19 @@ void CgenClassTable::code_global_data()
   // We also need to know the tag of the Int, String, and Bool classes
   // during code generation.
   //
+  int stringclasstag = 4;
+  int intclasstag = 2;
+  int boolclasstag = 3;
+  class_to_tag_table.addid(string, new int(4));
+  class_to_tag_table.addid(boolc, new int(3));
+  class_to_tag_table.addid(integer, new int(2));
 
-  int stringclasstag = *class_to_tag_table.lookup(string);
-  int intclasstag = *class_to_tag_table.lookup(integer);
-  int boolclasstag = *class_to_tag_table.lookup(boolc);
+
+  // str << "HI DEVANSHU " << string  << std::endl;
+  // int stringclasstag = *class_to_tag_table.lookup(string);
+  // str << "HI SHRAY" << std::endl;
+  // int intclasstag = *class_to_tag_table.lookup(integer);
+  // int boolclasstag = *class_to_tag_table.lookup(boolc);
 
   str << INTTAG << LABEL
       << WORD << intclasstag << std::endl;
@@ -541,6 +551,7 @@ void CgenClassTable::code_global_data()
   str << STRINGTAG << LABEL
       << WORD <<  stringclasstag
       << std::endl;
+  // str << LABEL << " HI " << LABEL  << " HI "<< std::endl;
 }
 
 //***************************************************
@@ -608,10 +619,12 @@ void CgenClassTable::code_constants()
   //
   // Add constants that are required by the code generator.
   //
+  // str << "Start of code_constants" << std::endl;
   stringtable.add_string("");
   inttable.add_string("0");
-
+  // str << "before class tag" << std::endl;
   int stringclasstag = *class_to_tag_table.lookup(idtable.lookup_string(STRINGNAME));
+  // str << "after class tag" << std::endl;
   int intclasstag = *class_to_tag_table.lookup(idtable.lookup_string(INTNAME));
 
   stringtable.code_string_table(str,stringclasstag);
@@ -817,6 +830,8 @@ CgenNodeP CgenNode::get_parentnd()
   return parentnd;
 }
 
+// void CgenClassTable::add_class_nameTab()
+
 
 void CgenClassTable::code()
 {
@@ -837,7 +852,8 @@ void CgenClassTable::code()
     //                   - class_nameTab
     //                   - dispatch tables
     //
-
+    // if (cgen_debug) std::cerr << "adding classes to table" << std::endl;
+    // add_class_nameTab();
 
     if (cgen_debug) std::cerr << "coding global text" << std::endl;
     code_global_text();
@@ -867,7 +883,12 @@ CgenNode::CgenNode(Class_ nd,Basicness bstatus, CgenClassTableP ct) :
    parentnd(NULL),
    basic_status(bstatus)
 {
-  // stringtable.add_string(name->get_string());          // Add class name to string table
+  // std::set<Symbol> bad_classes = {No_class, prim_slot, SELF_TYPE};
+  if (strcmp(name->get_string(), "_no_class") && strcmp(name->get_string(), "_prim_slot") && strcmp(name->get_string(), "SELF_TYPE")) {
+    std::cerr<< "name: " << name->get_string() << std::endl;
+    // std::cerr << Symbol(name->get_string()) << std::endl;
+    stringtable.add_string(name->get_string());          // Add class name to string table
+  }
 }
 
 
