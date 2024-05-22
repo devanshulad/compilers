@@ -38,6 +38,8 @@ private:
   void install_classes(Classes cs);
   void build_inheritance_tree();
   void set_relations(CgenNodeP nd);
+  void build_parent_map();
+  
 public:
   CgenClassTable(Classes, std::ostream& str);
   void code();

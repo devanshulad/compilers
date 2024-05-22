@@ -26,6 +26,9 @@
 #include "cgen_supp.h"
 #include "handle_flags.h"
 #include <set>
+#include <vector>
+#include <iostream>
+#include <map>
 
 //
 // Two symbols from the semantic analyzer (semant.cc) are used.
@@ -113,6 +116,7 @@ static const char *gc_collect_names[] =
 BoolConst falsebool(FALSE);
 BoolConst truebool(TRUE);
 
+std::map<Symbol, std::vector<Symbol>> parent_map;
 //*********************************************************
 //
 // Define method for code generation
@@ -405,6 +409,8 @@ void StringEntry::code_def(ostream& s, int stringclasstag)
      << WORD;
 
   /***** Add dispatch information for class String ******/
+  s << "String_dispTab";
+
   s << std::endl;                                              // dispatch table
   s << WORD;  lensym->code_ref(s);  s << std::endl;            // string length
   emit_string_constant(s,str);                                // ascii string
@@ -447,7 +453,7 @@ void IntEntry::code_def(ostream &s, int intclasstag)
     << WORD;
 
   /***** Add dispatch information for class Int ******/
-
+  s << "Int_dispTab";
   s << std::endl;                                          // dispatch table
   s << WORD << str << std::endl;                           // integer value
 }
@@ -488,7 +494,8 @@ void BoolConst::code_def(ostream& s, int boolclasstag)
     << WORD << boolclasstag << std::endl                       // class tag
     << WORD << (DEFAULT_OBJFIELDS + BOOL_SLOTS) << std::endl   // object size
     << WORD;
-
+  
+  s << "Bool_dispTab";
   /***** Add dispatch information for class Bool ******/
 
   s << std::endl;                                            // dispatch table
@@ -832,6 +839,22 @@ CgenNodeP CgenNode::get_parentnd()
 
 // void CgenClassTable::add_class_nameTab()
 
+void CgenClassTable::build_parent_map() {
+  parent_map = std::map<Symbol, std::vector<Symbol>>();
+  for (auto nd : nds) {
+    std::vector<Symbol> parent_of_nd;
+    CgenNodeP parent = nd->get_parentnd(nd);
+    while (parent != NULL) {
+      parent_of_nd.push_back(parent);
+      parent = parent->get_parentnd();
+    }
+    
+    if (nd->get_name() != Object) {
+      inheritance_graph.push_back(nd);
+    }
+  }
+}
+
 
 void CgenClassTable::code()
 {
@@ -854,6 +877,10 @@ void CgenClassTable::code()
     //
     // if (cgen_debug) std::cerr << "adding classes to table" << std::endl;
     // add_class_nameTab();
+    build_parent_map(); 
+    // inheritance table represented as a list of nd, called nds. 
+    // each nd in the list is a CLASS. each class has a parent and maybe children.
+    // can use the parent and children to traverse up or down the inheritance class.
 
     if (cgen_debug) std::cerr << "coding global text" << std::endl;
     code_global_text();
@@ -862,7 +889,16 @@ void CgenClassTable::code()
     //                   - object initializer
     //                   - the class methods
     //                   - etc...
+    std::cerr << root() << "root" << std::endl;
+    // std::cerr << root()->get_children() << "root children" << std::endl;
 
+    // for (int i = root()->get_children()->first(); root()->get_children()->more(i); i = root()->get_children()->next(i)) {
+    //   // std::cerr << root()->get_children()->nth(i) << "child" << std::endl;
+    //   root()->get_children().nth(i)->code();
+    // }
+    for (auto cgen_node : nds) {
+      cgen_node->code();
+    }
 }
 
 
@@ -885,7 +921,7 @@ CgenNode::CgenNode(Class_ nd,Basicness bstatus, CgenClassTableP ct) :
 {
   // std::set<Symbol> bad_classes = {No_class, prim_slot, SELF_TYPE};
   if (strcmp(name->get_string(), "_no_class") && strcmp(name->get_string(), "_prim_slot") && strcmp(name->get_string(), "SELF_TYPE")) {
-    std::cerr<< "name: " << name->get_string() << std::endl;
+    // std::cerr<< "name: " << name->get_string() << std::endl;
     // std::cerr << Symbol(name->get_string()) << std::endl;
     stringtable.add_string(name->get_string());          // Add class name to string table
   }
