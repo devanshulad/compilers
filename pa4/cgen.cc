@@ -330,6 +330,11 @@ static void emit_push(const char *reg, ostream& str)
   emit_addiu(SP,SP,-4,str);
 }
 
+static void emit_pop(const char *reg, ostream& str)
+{
+  emit_addiu(SP,SP,4,str);
+  emit_load(reg,0,SP,str);
+} 
 //
 // Fetch the integer value in an Int object. Emits code to fetch the integer
 // value of the Integer object pointed to by register source into the register dest
@@ -839,21 +844,21 @@ CgenNodeP CgenNode::get_parentnd()
 
 // void CgenClassTable::add_class_nameTab()
 
-void CgenClassTable::build_parent_map() {
-  parent_map = std::map<Symbol, std::vector<Symbol>>();
-  for (auto nd : nds) {
-    std::vector<Symbol> parent_of_nd;
-    CgenNodeP parent = nd->get_parentnd(nd);
-    while (parent != NULL) {
-      parent_of_nd.push_back(parent);
-      parent = parent->get_parentnd();
-    }
+// void CgenClassTable::build_parent_map() {
+//   parent_map = std::map<Symbol, std::vector<Symbol>>();
+//   for (auto nd : nds) {
+//     std::vector<Symbol> parent_of_nd;
+//     CgenNodeP parent = nd->get_parentnd(nd);
+//     while (parent != NULL) {
+//       parent_of_nd.push_back(parent);
+//       parent = parent->get_parentnd();
+//     }
     
-    if (nd->get_name() != Object) {
-      inheritance_graph.push_back(nd);
-    }
-  }
-}
+//     if (nd->get_name() != Object) {
+//       inheritance_graph.push_back(nd);
+//     }
+//   }
+// }
 
 
 void CgenClassTable::code()
@@ -877,7 +882,7 @@ void CgenClassTable::code()
     //
     // if (cgen_debug) std::cerr << "adding classes to table" << std::endl;
     // add_class_nameTab();
-    build_parent_map(); 
+    // build_parent_map(); 
     // inheritance table represented as a list of nd, called nds. 
     // each nd in the list is a CLASS. each class has a parent and maybe children.
     // can use the parent and children to traverse up or down the inheritance class.
@@ -889,17 +894,23 @@ void CgenClassTable::code()
     //                   - object initializer
     //                   - the class methods
     //                   - etc...
-    std::cerr << root() << "root" << std::endl;
+    // std::cerr << root() << "root" << std::endl;
     // std::cerr << root()->get_children() << "root children" << std::endl;
 
     // for (int i = root()->get_children()->first(); root()->get_children()->more(i); i = root()->get_children()->next(i)) {
     //   // std::cerr << root()->get_children()->nth(i) << "child" << std::endl;
     //   root()->get_children().nth(i)->code();
     // }
-    for (auto cgen_node : nds) {
-      cgen_node->code();
+
+    for (auto nd: nds) {
+      static_cast<Class_>(nd)->code(str);
     }
+    // for (auto cgen_node : nds) {
+    //   cgen_node->code();
+    // }
 }
+
+
 
 
 CgenNodeP CgenClassTable::root()
@@ -938,6 +949,24 @@ CgenNode::CgenNode(Class_ nd,Basicness bstatus, CgenClassTableP ct) :
 //
 //*****************************************************************
 
+void class__class::code(ostream &s) {
+  // s << "reached a class " << name << endl;
+  // cerr << "reached a class" << endl;
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    features->nth(i)->code(s);
+  }
+  
+}
+
+void method_class::code(ostream &s) {
+  // s << "reached a method " << name << endl;
+}
+
+void attr_class::code (ostream &s) {
+  // s << "reached an attribute " << name << endl;
+  init->code(s);
+}
+
 void branch_class::code(ostream &s) {
 }
 
@@ -966,6 +995,14 @@ void let_class::code(ostream &s) {
 }
 
 void plus_class::code(ostream &s) {
+  e1->code(s);
+  emit_push(ACC, s);
+  e2->code(s);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(ACC, ACC, s);
+  emit_add(ACC, ACC, T1, s);
+  emit_store_int(ACC, ACC, s);
 }
 
 void sub_class::code(ostream &s) {

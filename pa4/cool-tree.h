@@ -34,6 +34,7 @@ class Class__class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Class_(); }
    virtual Class_ copy_Class_() = 0;
+   virtual void code (ostream& s) = 0;
 
 #ifdef Class__EXTRAS
    Class__EXTRAS
@@ -48,6 +49,7 @@ class Feature_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
+   virtual void code(ostream&) = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -160,6 +162,7 @@ public:
    }
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
+   void code(ostream& s);
 
 #ifdef Class__SHARED_EXTRAS
    Class__SHARED_EXTRAS
@@ -186,6 +189,7 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+   void code(ostream& stream);
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -210,6 +214,7 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+   void code(ostream& stream);
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
