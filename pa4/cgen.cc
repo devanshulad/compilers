@@ -894,23 +894,127 @@ void CgenClassTable::code()
     //                   - object initializer
     //                   - the class methods
     //                   - etc...
-    // std::cerr << root() << "root" << std::endl;
-    // std::cerr << root()->get_children() << "root children" << std::endl;
+    all_object_inits();
 
-    // for (int i = root()->get_children()->first(); root()->get_children()->more(i); i = root()->get_children()->next(i)) {
-    //   // std::cerr << root()->get_children()->nth(i) << "child" << std::endl;
-    //   root()->get_children().nth(i)->code();
-    // }
-
-    for (auto nd: nds) {
-      static_cast<Class_>(nd)->code(str);
-    }
-    // for (auto cgen_node : nds) {
-    //   cgen_node->code();
-    // }
+    recursive_gen_code();
 }
 
+/*
+Object_init:
+  addiu	$sp $sp -12
+	sw	$fp 12($sp)
+	sw	$s0 8($sp)
+	sw	$ra 4($sp)
+	addiu	$fp $sp 16
+	move	$s0 $a0
+	move	$a0 $s0
+	lw	$fp 12($sp)
+	lw	$s0 8($sp)
+	lw	$ra 4($sp)
+	addiu	$sp $sp 12
+	jr	$ra	
+*/
+int CgenNode::get_num_parents_attr() {
+  int num_parents_attr = 0;
+  Symbol curr = name;
+  // cerr << curr << endl;
+  CgenNode* curr_node = this;
+  while (curr != Object && curr != No_class) {
+    // num_parents_attr += class_->get_features()->len();
+    for (int i = curr_node->features->first(); curr_node->features->more(i); i = curr_node->features->next(i)) {
+      if (!curr_node->features->nth(i)->isMethod()) {
+        num_parents_attr++;
+      }
+    }
+    curr_node = curr_node->get_parentnd();
+    curr = curr_node->name;
+    // cerr << curr << endl;
+  }
+  return num_parents_attr;
+}
 
+void CgenNode::class_init_func(ostream& str) {
+  str << name << "_init" << LABEL;
+  // adds to stack
+  emit_addiu(SP, SP, -12, str);
+  emit_store(FP, 3, SP, str);
+  emit_store(SELF, 2, SP, str);
+  emit_store(RA, 1, SP, str);
+
+  
+  // change fp and store prev return value in s0
+  emit_addiu(FP, SP, 16, str);
+  emit_move(SELF, ACC, str);
+  
+  int par_attributes = parentnd->get_num_parents_attr();
+  cerr << "parent of " << name << " have " << par_attributes << " many attributes." << endl;
+  int offset = 3 + par_attributes;
+  // cerr << "parent of " << name << " is " << parentnd->name << endl;
+  // int offset = 3;
+  if (name != Object) {
+    str << JAL << parent << "_init" << endl;
+    for (int i = features->first(); features->more(i); i = features->next(i)) {
+      if (!features->nth(i)->isMethod()) {
+        features->nth(i)->code(str);
+        emit_store(ACC, offset, SELF, str);
+        offset++;
+      }
+    }
+  }
+
+
+// void class__class::class_init_func(ostream& str, CgenNodeP nd) {
+//   str << name << "_init" << LABEL;
+//   // adds to stack
+//   emit_addiu(SP, SP, -12, str);
+//   emit_store(FP, 3, SP, str);
+//   emit_store(SELF, 2, SP, str);
+//   emit_store(RA, 1, SP, str);
+
+  
+//   // change fp and store prev return value in s0
+//   emit_addiu(FP, SP, 16, str);
+//   emit_move(SELF, ACC, str);
+  
+//   int par_attributes = get_num_parents_attr(nd->parentnd);
+//   cerr << "parent of " << name << " have " << par_attributes << " many attributes." << endl;
+//   int offset = 3 + par_attributes;
+  
+//   if (name != Object) {
+//     str << JAL << parent << "_init" << endl;
+//     for (int i = features->first(); features->more(i); i = features->next(i)) {
+//       if (!features->nth(i)->isMethod()) {
+//         features->nth(i)->code(str);
+//         emit_store(ACC, offset, SELF, str);
+//         offset++;
+//       }
+//     }
+//   }
+
+  emit_move(ACC, SELF, str);
+  // retrieve from stack
+  emit_load(FP, 3, SP, str);
+  emit_load(SELF, 2, SP, str);
+  emit_load(RA, 1, SP, str);
+  emit_addiu(SP, SP, 12, str);
+
+  //jump return 
+  str << RET << endl;
+}
+
+void CgenClassTable::all_object_inits() {
+  for (auto nd: nds) {
+    nd->class_init_func(str);
+    // class__class class = static_cast<class__class>(nd);
+    // class->class_init_func();
+  }
+}
+
+void CgenClassTable::recursive_gen_code() {
+  for (auto nd: nds) {
+    static_cast<Class_>(nd)->code(str);
+  }
+}  
 
 
 CgenNodeP CgenClassTable::root()

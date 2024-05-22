@@ -39,6 +39,10 @@ private:
   void build_inheritance_tree();
   void set_relations(CgenNodeP nd);
   void build_parent_map();
+
+  // we added 
+  void all_object_inits();
+  void recursive_gen_code();
   
 public:
   CgenClassTable(Classes, std::ostream& str);
@@ -63,6 +67,8 @@ public:
   void set_parentnd(CgenNodeP p);
   CgenNodeP get_parentnd();
   int basic() { return (basic_status == Basic); }
+  void class_init_func(ostream& s);
+  int get_num_parents_attr();
 };
 
 class BoolConst {
