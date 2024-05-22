@@ -36,6 +36,8 @@ public:
    tree_node *copy()		 { return copy_Class_(); }
    virtual Class_ copy_Class_() = 0;
    virtual void code (ostream& s) = 0;
+   virtual Features get_features() = 0;
+   virtual Symbol getName() = 0;
 
 #ifdef Class__EXTRAS
    Class__EXTRAS
@@ -52,6 +54,8 @@ public:
    virtual Feature copy_Feature() = 0;
    virtual void code(ostream&) = 0;
    virtual bool isMethod() = 0;
+   virtual Symbol getName() = 0;
+   virtual Symbol get_type_decl() = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -165,6 +169,8 @@ public:
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
    void code(ostream& s);
+   Features get_features() { return features; }
+   Symbol getName() { return name; }
 
 #ifdef Class__SHARED_EXTRAS
    Class__SHARED_EXTRAS
@@ -193,6 +199,8 @@ public:
    void dump(ostream& stream, int n);
    void code(ostream& stream);
    bool isMethod() { return true; };
+   Symbol getName() { return name; }
+   Symbol get_type_decl() { return return_type; }
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -219,6 +227,8 @@ public:
    void dump(ostream& stream, int n);
    void code(ostream& stream);
    bool isMethod() { return false; };
+   Symbol getName() { return name; }
+   Symbol get_type_decl() { return type_decl; }
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS

@@ -29,6 +29,7 @@
 #include <vector>
 #include <iostream>
 #include <map>
+#include <set>
 
 //
 // Two symbols from the semantic analyzer (semant.cc) are used.
@@ -117,6 +118,8 @@ BoolConst falsebool(FALSE);
 BoolConst truebool(TRUE);
 
 std::map<Symbol, std::vector<Symbol>> parent_map;
+std::map<Symbol, int> class_to_tag;
+int tag_counter = 5;
 //*********************************************************
 //
 // Define method for code generation
@@ -366,6 +369,32 @@ static void emit_gc_check(const char *source, ostream &s)
 }
 
 
+static void emit_func_start(ostream &str)
+{
+  // adds to stack
+  emit_addiu(SP, SP, -12, str);
+  emit_store(FP, 3, SP, str);
+  emit_store(SELF, 2, SP, str);
+  emit_store(RA, 1, SP, str);  
+  
+  // change fp and store prev return value in s0
+  emit_addiu(FP, SP, 16, str);
+  emit_move(SELF, ACC, str);
+}
+
+static void emit_func_end(ostream &str)
+{
+  // emit_move(ACC, SELF, str);
+  // retrieve from stack
+  emit_load(FP, 3, SP, str);
+  emit_load(SELF, 2, SP, str);
+  emit_load(RA, 1, SP, str);
+  emit_addiu(SP, SP, 12, str);
+  //jump return 
+  str << RET << endl;
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 // coding strings, ints, and booleans
@@ -542,27 +571,13 @@ void CgenClassTable::code_global_data()
   // We also need to know the tag of the Int, String, and Bool classes
   // during code generation.
   //
-  int stringclasstag = 4;
-  int intclasstag = 2;
-  int boolclasstag = 3;
-  class_to_tag_table.addid(string, new int(4));
-  class_to_tag_table.addid(boolc, new int(3));
-  class_to_tag_table.addid(integer, new int(2));
-
-
-  // str << "HI DEVANSHU " << string  << std::endl;
-  // int stringclasstag = *class_to_tag_table.lookup(string);
-  // str << "HI SHRAY" << std::endl;
-  // int intclasstag = *class_to_tag_table.lookup(integer);
-  // int boolclasstag = *class_to_tag_table.lookup(boolc);
 
   str << INTTAG << LABEL
-      << WORD << intclasstag << std::endl;
+      << WORD << class_to_tag[Int] << std::endl;
   str << BOOLTAG << LABEL
-      << WORD << boolclasstag << std::endl;
+      << WORD << class_to_tag[Bool] << std::endl;
   str << STRINGTAG << LABEL
-      << WORD <<  stringclasstag
-      << std::endl;
+      << WORD <<  class_to_tag[Str] << std::endl;
   // str << LABEL << " HI " << LABEL  << " HI "<< std::endl;
 }
 
@@ -594,7 +609,7 @@ void CgenClassTable::code_global_text()
 
 void CgenClassTable::code_bools()
 {
-  int boolclasstag = *class_to_tag_table.lookup(idtable.add_string(BOOLNAME));
+  int boolclasstag = class_to_tag[Bool];
   falsebool.code_def(str,boolclasstag);
   truebool.code_def(str,boolclasstag);
 }
@@ -635,9 +650,9 @@ void CgenClassTable::code_constants()
   stringtable.add_string("");
   inttable.add_string("0");
   // str << "before class tag" << std::endl;
-  int stringclasstag = *class_to_tag_table.lookup(idtable.lookup_string(STRINGNAME));
+  int stringclasstag = class_to_tag[Str];
   // str << "after class tag" << std::endl;
-  int intclasstag = *class_to_tag_table.lookup(idtable.lookup_string(INTNAME));
+  int intclasstag = class_to_tag[Int];
 
   stringtable.code_string_table(str,stringclasstag);
   inttable.code_string_table(str,intclasstag);
@@ -647,7 +662,7 @@ void CgenClassTable::code_constants()
 CgenClassTable::CgenClassTable(Classes classes, ostream& s) : str(s) {
 
   // make sure the various tables have a scope
-  class_to_tag_table.enterscope();
+  // class_to_tag_table.enterscope();
 
   enterscope();
   if (cgen_debug) std::cerr << "Building CgenClassTable" << std::endl;
@@ -860,11 +875,29 @@ CgenNodeP CgenNode::get_parentnd()
 //   }
 // }
 
+void CgenClassTable::assign_tags() {
+  std::set<Symbol> already_assigned = {IO, Str, Int, Bool, Object};
+  class_to_tag[Object] = 0; 
+  class_to_tag[IO] = 1;
+  class_to_tag[Int] = 2;
+  class_to_tag[Bool] = 3;
+  class_to_tag[Str] = 4;
+  
+  for (auto nd : nds) {
+    Symbol name = nd->get_name();
+    if (already_assigned.find(nd->get_name()) == already_assigned.end()) {
+      class_to_tag[nd->get_name()] = tag_counter;
+      tag_counter++;
+    }
+  }
+}
+
 
 void CgenClassTable::code()
 {
 
-
+    if (cgen_debug) std::cerr << "assigning the tags" << std::endl;
+    assign_tags();
 
     if (cgen_debug) std::cerr << "coding global data" << std::endl;
     code_global_data();
@@ -886,6 +919,12 @@ void CgenClassTable::code()
     // inheritance table represented as a list of nd, called nds. 
     // each nd in the list is a CLASS. each class has a parent and maybe children.
     // can use the parent and children to traverse up or down the inheritance class.
+    if (cgen_debug) std::cerr << "making dispatch tables" << std::endl;
+    make_dispatch_tables(str);
+
+    if (cgen_debug) std::cerr << "making proto tables" << std::endl;
+    make_protos();
+
 
     if (cgen_debug) std::cerr << "coding global text" << std::endl;
     code_global_text();
@@ -895,8 +934,9 @@ void CgenClassTable::code()
     //                   - the class methods
     //                   - etc...
     all_object_inits();
+    all_funcs();
 
-    recursive_gen_code();
+    // recursive_gen_code();
 }
 
 /*
@@ -933,80 +973,86 @@ int CgenNode::get_num_parents_attr() {
   return num_parents_attr;
 }
 
+void CgenNode::rec_proto(ostream& s) {
+  if (name != Object) {
+    parentnd->rec_proto(s);
+  }
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    if (!features->nth(i)->isMethod()) {
+      s << WORD;
+      if (features->nth(i)->get_type_decl() == Int) {
+        inttable.lookup_string("0")->code_ref(s);
+      } else if (features->nth(i)->get_type_decl() == Str) {
+        stringtable.lookup_string("")->code_ref(s);
+      } else if (features->nth(i)->get_type_decl() == Bool) {
+        falsebool.code_ref(s);
+      } else {
+        s << "0";
+      }
+      s << endl;
+    }
+  }
+}
+
+void CgenNode::make_prototype(ostream& s) {
+  s << WORD << "-1" << endl;
+  s << get_name() << "_protObj" << LABEL;
+  s << WORD << class_to_tag[get_name()] << endl;
+  int num_attributes = get_num_parents_attr();
+  s << WORD << (DEFAULT_OBJFIELDS + num_attributes) << endl;
+  s << WORD << get_name() << "_dispTab" << endl;
+  rec_proto(s);
+}
+
+void CgenClassTable::make_protos() {
+  for (auto nd: nds) {
+    nd->make_prototype(str);
+  }
+}
+
 void CgenNode::class_init_func(ostream& str) {
   str << name << "_init" << LABEL;
-  // adds to stack
-  emit_addiu(SP, SP, -12, str);
-  emit_store(FP, 3, SP, str);
-  emit_store(SELF, 2, SP, str);
-  emit_store(RA, 1, SP, str);
-
-  
-  // change fp and store prev return value in s0
-  emit_addiu(FP, SP, 16, str);
-  emit_move(SELF, ACC, str);
+  emit_func_start(str);
   
   int par_attributes = parentnd->get_num_parents_attr();
-  cerr << "parent of " << name << " have " << par_attributes << " many attributes." << endl;
+  // cerr << "parent of " << name << " have " << par_attributes << " many attributes." << endl;
   int offset = 3 + par_attributes;
   // cerr << "parent of " << name << " is " << parentnd->name << endl;
   // int offset = 3;
   if (name != Object) {
     str << JAL << parent << "_init" << endl;
     for (int i = features->first(); features->more(i); i = features->next(i)) {
-      if (!features->nth(i)->isMethod()) {
+      if (!features->nth(i)->isMethod() && name != Str && name != Int && name != Bool && name != IO) {
         features->nth(i)->code(str);
         emit_store(ACC, offset, SELF, str);
         offset++;
       }
     }
   }
-
-
-// void class__class::class_init_func(ostream& str, CgenNodeP nd) {
-//   str << name << "_init" << LABEL;
-//   // adds to stack
-//   emit_addiu(SP, SP, -12, str);
-//   emit_store(FP, 3, SP, str);
-//   emit_store(SELF, 2, SP, str);
-//   emit_store(RA, 1, SP, str);
-
   
-//   // change fp and store prev return value in s0
-//   emit_addiu(FP, SP, 16, str);
-//   emit_move(SELF, ACC, str);
-  
-//   int par_attributes = get_num_parents_attr(nd->parentnd);
-//   cerr << "parent of " << name << " have " << par_attributes << " many attributes." << endl;
-//   int offset = 3 + par_attributes;
-  
-//   if (name != Object) {
-//     str << JAL << parent << "_init" << endl;
-//     for (int i = features->first(); features->more(i); i = features->next(i)) {
-//       if (!features->nth(i)->isMethod()) {
-//         features->nth(i)->code(str);
-//         emit_store(ACC, offset, SELF, str);
-//         offset++;
-//       }
-//     }
-//   }
-
   emit_move(ACC, SELF, str);
-  // retrieve from stack
-  emit_load(FP, 3, SP, str);
-  emit_load(SELF, 2, SP, str);
-  emit_load(RA, 1, SP, str);
-  emit_addiu(SP, SP, 12, str);
-
-  //jump return 
-  str << RET << endl;
+  emit_func_end(str);
 }
 
 void CgenClassTable::all_object_inits() {
   for (auto nd: nds) {
     nd->class_init_func(str);
-    // class__class class = static_cast<class__class>(nd);
-    // class->class_init_func();
+  }
+}
+
+void CgenClassTable::all_funcs() {
+  for (auto nd: nds) {
+    if (nd->getName() != Object && nd->getName() != Int && nd->getName() != Str && nd->getName() != Bool && nd->getName() != IO){
+      // emit code for each method in the class (not inherited methods..
+      for (int i = nd->get_features()->first(); nd->get_features()->more(i); i = nd->get_features()->next(i)) {
+        if (nd->get_features()->nth(i)->isMethod()) {
+          // emit code for method 
+          str << nd->getName() << "." << nd->get_features()->nth(i)->getName() << LABEL;
+          nd->get_features()->nth(i)->code(str);
+          // str << "\t--------" << endl;
+        }
+      }
+    }
   }
 }
 
@@ -1015,6 +1061,25 @@ void CgenClassTable::recursive_gen_code() {
     static_cast<Class_>(nd)->code(str);
   }
 }  
+
+void CgenNode::make_dispatch(ostream& s) {
+  // recursion
+  if (name != Object) {
+    parentnd->make_dispatch(s);
+  }
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    if (features->nth(i)->isMethod()) {
+      s << WORD << name << "." << features->nth(i)->getName() << endl;
+    }
+  }
+}
+
+void CgenClassTable::make_dispatch_tables(ostream& s) {
+  for (auto nd: nds) {
+    s << nd->get_name() << "_dispTab" << LABEL;
+    nd->make_dispatch(s);
+  }
+}
 
 
 CgenNodeP CgenClassTable::root()
@@ -1064,6 +1129,10 @@ void class__class::code(ostream &s) {
 
 void method_class::code(ostream &s) {
   // s << "reached a method " << name << endl;
+  
+  emit_func_start(s);
+  expr->code(s);
+  emit_func_end(s);
 }
 
 void attr_class::code (ostream &s) {

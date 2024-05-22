@@ -21,7 +21,7 @@ class CgenClassTable : public SymbolTable<Symbol,CgenNode> {
 private:
   std::list<CgenNodeP> nds;
   std::ostream& str;
-  SymbolTable<Symbol,int> class_to_tag_table;
+  // SymbolTable<Symbol,int> class_to_tag_table;
 
   // The following methods emit code for constants and global declarations.
   void code_global_data();
@@ -43,6 +43,10 @@ private:
   // we added 
   void all_object_inits();
   void recursive_gen_code();
+  void all_funcs();
+  void make_dispatch_tables(ostream& s);
+  void assign_tags();
+  void make_protos();
   
 public:
   CgenClassTable(Classes, std::ostream& str);
@@ -69,6 +73,9 @@ public:
   int basic() { return (basic_status == Basic); }
   void class_init_func(ostream& s);
   int get_num_parents_attr();
+  void make_dispatch(ostream& s);
+  void rec_proto(ostream& s);
+  void make_prototype(ostream& s);
 };
 
 class BoolConst {
