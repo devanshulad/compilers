@@ -47,6 +47,12 @@ private:
   void make_dispatch_tables(ostream& s);
   void assign_tags();
   void make_protos();
+  void make_attr_tables();
+  void class_obj_table();
+  void class_name_tab();
+  void class_parent_tab();
+  void reverse_nds_list();
+
   
 public:
   CgenClassTable(Classes, std::ostream& str);
@@ -76,6 +82,8 @@ public:
   void make_dispatch(ostream& s);
   void rec_proto(ostream& s);
   void make_prototype(ostream& s);
+  void make_attr(ostream& s, bool isFirst);
+
 };
 
 class BoolConst {

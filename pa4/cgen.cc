@@ -551,7 +551,7 @@ void CgenClassTable::code_global_data()
   Symbol string  = idtable.lookup_string(STRINGNAME);
   Symbol integer = idtable.lookup_string(INTNAME);
   Symbol boolc   = idtable.lookup_string(BOOLNAME);
-
+  str << "#!/afs/ir/class/cs143/bin/spim -trap_file /afs/ir/class/cs143/lib/trap.handler -file" << std::endl;
   str << "\t.data\n" << ALIGN;
   //
   // The following global names must be defined first.
@@ -566,12 +566,22 @@ void CgenClassTable::code_global_data()
   str << GLOBAL << BOOLTAG << std::endl;
   str << GLOBAL << STRINGTAG << std::endl;
 
+  
+  str << GLOBAL << "_max_tag" << std::endl;
+  str << GLOBAL << "class_objTab" << std::endl;
+  str << GLOBAL << "class_parentTab" << std::endl;
+  str << GLOBAL << "class_attrTabTab" << std::endl;
 
   //
   // We also need to know the tag of the Int, String, and Bool classes
   // during code generation.
   //
-
+  for (auto nd: nds) {
+    str << GLOBAL << nd->get_name() << "_protObj" << std::endl;
+    str << GLOBAL << nd->get_name() << "_init" << std::endl;
+    str << GLOBAL << nd->get_name() << "_attrTab" << std::endl;
+  }
+  
   str << INTTAG << LABEL
       << WORD << class_to_tag[Int] << std::endl;
   str << BOOLTAG << LABEL
@@ -892,10 +902,30 @@ void CgenClassTable::assign_tags() {
   }
 }
 
+void CgenClassTable::reverse_nds_list() {
+  nds.reverse();
+
+  // std::list<CgenNodeP> basic_classes;
+  std::list<CgenNodeP>::iterator it1, it2;
+
+  it1 = nds.begin() ;
+  it2 = nds.begin();
+  advance(it1, 1);
+  advance(it2, 5);
+
+  std::list<CgenNodeP> middle_list = std::list<CgenNodeP>(it1, it2);
+  nds.erase (it1,it2);
+  middle_list.reverse();
+  nds.insert(nds.end(), middle_list.begin(), middle_list.end());
+  // nds.merge(middle_list);
+}
+
 
 void CgenClassTable::code()
 {
-
+    
+    reverse_nds_list();
+    
     if (cgen_debug) std::cerr << "assigning the tags" << std::endl;
     assign_tags();
 
@@ -919,6 +949,11 @@ void CgenClassTable::code()
     // inheritance table represented as a list of nd, called nds. 
     // each nd in the list is a CLASS. each class has a parent and maybe children.
     // can use the parent and children to traverse up or down the inheritance class.
+    class_name_tab();
+    class_obj_table();
+    class_parent_tab();
+    make_attr_tables();
+
     if (cgen_debug) std::cerr << "making dispatch tables" << std::endl;
     make_dispatch_tables(str);
 
@@ -991,6 +1026,70 @@ void CgenNode::rec_proto(ostream& s) {
       }
       s << endl;
     }
+  }
+}
+
+void CgenClassTable::class_parent_tab() {
+  str << "class_parentTab" << LABEL;
+  for (auto nd: nds) {
+    if (nd->get_name() == Object) {
+      str << WORD << "-2" << endl;
+    } else {  
+      str << WORD << class_to_tag[nd->get_parent()] << endl;
+    }
+  }
+}
+
+void CgenClassTable::class_name_tab() {
+  str << "class_nameTab" << LABEL;
+  for (auto nd: nds) {
+    str << WORD;
+    stringtable.lookup_string(nd->get_name()->get_string())->code_ref(str);
+    str << endl;
+  }
+}
+
+void CgenClassTable::class_obj_table() {
+  str << "class_objTab" << LABEL;
+  for (auto nd: nds) {
+    str << WORD << nd->get_name() << "_protObj" << endl;
+    str << WORD << nd->get_name() << "_init" << endl;
+  }
+  str << "_max_tag" << LABEL;
+  str << WORD << tag_counter - 1 << endl;
+}
+
+void CgenNode::make_attr(ostream& s, bool isFirst) {
+  if (isFirst) {
+    s << name << "_attrTab" << LABEL;
+  }
+  if (name == Object || name == IO) {
+    return;
+  }
+  if (name == Int || name == Bool) {
+    s << WORD << "-2" << endl;
+    return;
+  }
+  if (name == Str) {
+    s << WORD << "2" << endl;
+    s << WORD << "-2" << endl;
+    return; 
+  }
+  parentnd->make_attr(s, false);
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    if (!features->nth(i)->isMethod()) {
+      s << WORD << "2" << endl;
+    }
+  }
+}
+
+void CgenClassTable::make_attr_tables() {
+  str << "Class_attrTabTab" << LABEL;
+  for (auto nd: nds) {
+    str << WORD << nd->get_name() << "_attrTab" << endl;
+  }
+  for (auto nd: nds) {
+    nd->make_attr(str, true);
   }
 }
 
@@ -1123,6 +1222,7 @@ void class__class::code(ostream &s) {
   // cerr << "reached a class" << endl;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     features->nth(i)->code(s);
+  
   }
   
 }
