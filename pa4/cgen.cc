@@ -120,6 +120,7 @@ BoolConst truebool(TRUE);
 std::map<Symbol, std::vector<Symbol>> parent_map;
 std::map<Symbol, int> class_to_tag;
 int tag_counter = 5;
+int label_count = 0;
 //*********************************************************
 //
 // Define method for code generation
@@ -1084,7 +1085,7 @@ void CgenNode::make_attr(ostream& s, bool isFirst) {
 }
 
 void CgenClassTable::make_attr_tables() {
-  str << "Class_attrTabTab" << LABEL;
+  str << "class_attrTabTab" << LABEL;
   for (auto nd: nds) {
     str << WORD << nd->get_name() << "_attrTab" << endl;
   }
@@ -1247,9 +1248,58 @@ void assign_class::code(ostream &s) {
 }
 
 void static_dispatch_class::code(ostream &s) {
+  // cerr << "static dispatch" << endl;
 }
 
+/* 	
+  la	$a0 int_const0
+	sw	$a0 0($sp)
+	addiu	$sp $sp -4
+	move	$a0 $s0
+	bne	$a0 $zero label0
+	la	$a0 str_const0
+	li	$t1 3
+	jal	_dispatch_abort
+label0:
+	lw	$t1 8($a0)
+	lw	$t1 16($t1)
+	jalr		$t1
+*/
 void dispatch_class::code(ostream &s) {
+  // cerr << "dynamic dispatch " << endl;xs
+  // assume we are only working on out_int right now:
+
+  /*
+   Expression expr;
+   Symbol name;
+   Expressions actual;
+
+   Expressions is list<Expression>
+  */
+  // cerr << expr << " is expr" << std::endl;
+  if (expr != NULL) {
+    for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+      actual->nth(i)->code(s);
+      emit_push(ACC, s);
+    }
+    // emit_load_int(ACC, inttable.lookup_string("50"), s);
+    // emit_store(ACC, 0, SP, s);
+    // emit_addiu(SP, SP, -4, s);
+    // COME BACK AND CHECK
+    emit_move(ACC, SELF, s); // which should be expr->code(s);
+    // expr->code(s);
+
+    emit_bne(ACC, ZERO, label_count, s);
+    emit_load_string(ACC, stringtable.lookup_string("pa4-easy.cl"), s);
+    emit_load_imm(T1, 3, s);
+    emit_jal("_dispatch_abort", s);
+    emit_label_ref(label_count, s);
+    s << LABEL;
+    emit_load(T1, 2, ACC, s);
+    emit_load(T1, 4, T1, s);
+    emit_jalr(T1, s);
+    label_count++;
+  }
 }
 
 void cond_class::code(ostream &s) {
