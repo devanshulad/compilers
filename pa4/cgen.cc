@@ -125,6 +125,7 @@ struct funcNameHolder {
 std::map<Symbol, std::vector<Symbol>> parent_map;
 std::map<Symbol, int> class_to_tag;
 std::map<Symbol, std::vector<funcNameHolder>> func_to_offset;
+std::map<Symbol, std::map<Symbol, std::vector<Symbol>>> class_to_func_to_param_off;
 int tag_counter = 5;
 int label_count = 0;
 //*********************************************************
@@ -1183,7 +1184,6 @@ void CgenNode::make_dispatch(ostream& s, Symbol class_name) {
   if (name != Object) {
     parentnd->make_dispatch(s, class_name);
   }
-  std::map<Symbol, std::vector<Symbol>> func_to_param_off;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (features->nth(i)->isMethod()) {
       s << WORD << name << "." << features->nth(i)->getName() << endl;
@@ -1191,24 +1191,51 @@ void CgenNode::make_dispatch(ostream& s, Symbol class_name) {
       curr_func.className = name;
       curr_func.funcName = features->nth(i)->getName();
       func_to_offset[class_name].push_back(curr_func);   
-
-      std::vector<Symbol> param_lst;
-      for (Formal param: features->nth(i)->formals) {
-        param_lst.push_back(param->getName());
-      }
-      func_to_param_off[features->nth(i)->name] = param_lst;
     }
   }
-  if (func_to_param_off.size() != 0)
-    class_to_func_to_param_off[class_name] = func_to_param_off;
+}
 
-  
+void CgenNode::rec_add_params(std::map<Symbol, std::vector<Symbol>>& func_to_param) {
+  if (name != Object) {
+    parentnd->rec_add_params(func_to_param);
+  }
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    if (features->nth(i)->isMethod()) {
+      Formals params = features->nth(i)->getFormals();
+      std::vector<Symbol> param_lst;
+      for (int j = params->first(); params->more(j); j = params->next(j)) {
+        param_lst.push_back(params->nth(j)->getName());
+      }
+      func_to_param[features->nth(i)->getName()] = param_lst;
+    }
+  }
+
+}
+
+void CgenNode::create_func_to_param(ostream& s, Symbol class_name) {
+  std::map<Symbol, std::vector<Symbol>> func_to_param;
+  rec_add_params(func_to_param);
+
+  if (func_to_param.size() != 0)
+    class_to_func_to_param_off[class_name] = func_to_param;
+
+  // for (auto& classFunc: class_to_func_to_param_off) {
+  //   cerr << "className is " << classFunc.first << "\n";
+  //   for (auto& funcToParams: classFunc.second) {
+  //     cerr << "\t" << funcToParams.first << ": ";
+  //     for (auto elem: funcToParams.second) {
+  //       cerr << elem << " ";
+  //     }
+  //     cerr << "\n";
+  //   }
+  // }
 }
 
 void CgenClassTable::make_dispatch_tables(ostream& s) {
   for (auto nd: nds) {
     s << nd->get_name() << "_dispTab" << LABEL;
     nd->make_dispatch(s, nd->get_name());
+    nd->create_func_to_param(s, nd->get_name());
   }
 }
 

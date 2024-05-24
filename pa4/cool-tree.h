@@ -56,6 +56,7 @@ public:
    virtual bool isMethod() = 0;
    virtual Symbol getName() = 0;
    virtual Symbol get_type_decl() = 0;
+   virtual Formals getFormals() = 0;
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -202,6 +203,7 @@ public:
    bool isMethod() { return true; };
    Symbol getName() { return name; }
    Symbol get_type_decl() { return return_type; }
+   Formals getFormals() { return formals; }
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -230,6 +232,7 @@ public:
    bool isMethod() { return false; };
    Symbol getName() { return name; }
    Symbol get_type_decl() { return type_decl; }
+   Formals getFormals() { return NULL; }
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -252,7 +255,7 @@ public:
    }
    Formal copy_Formal();
    void dump(ostream& stream, int n);
-   Symbol getName();
+   Symbol getName() { return name; }
 
 #ifdef Formal_SHARED_EXTRAS
    Formal_SHARED_EXTRAS

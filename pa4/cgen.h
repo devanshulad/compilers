@@ -5,6 +5,8 @@
 #include "cool-tree.h"
 #include "emit.h"
 #include "symtab.h"
+#include <map>
+#include <vector>
 
 enum Basicness     {Basic, NotBasic};
 #define TRUE 1
@@ -83,7 +85,8 @@ public:
   void rec_proto(ostream& s);
   void make_prototype(ostream& s);
   void make_attr(ostream& s, bool isFirst);
-
+  void create_func_to_param(ostream& s, Symbol class_name);
+  void rec_add_params(std::map<Symbol, std::vector<Symbol>>& func_to_param);
 };
 
 class BoolConst {
