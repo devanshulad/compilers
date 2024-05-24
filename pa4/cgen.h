@@ -79,7 +79,7 @@ public:
   int basic() { return (basic_status == Basic); }
   void class_init_func(ostream& s);
   int get_num_parents_attr();
-  void make_dispatch(ostream& s);
+  void make_dispatch(ostream& s, Symbol class_name);
   void rec_proto(ostream& s);
   void make_prototype(ostream& s);
   void make_attr(ostream& s, bool isFirst);

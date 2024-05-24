@@ -1,4 +1,5 @@
 #!/afs/ir/class/cs143/bin/spim -trap_file /afs/ir/class/cs143/lib/trap.handler -file
+#!/afs/ir/class/cs143/bin/spim -trap_file /afs/ir/class/cs143/lib/trap.handler -file
 	.data
 	.align	2
 	.globl	class_nameTab
@@ -255,50 +256,50 @@ bool_const1:
 	.word	1
 class_nameTab:
 	.word	str_const2
-	.word	str_const3
-	.word	str_const4
-	.word	str_const5
-	.word	str_const6
 	.word	str_const7
 	.word	str_const8
 	.word	str_const9
+	.word	str_const6
+	.word	str_const5
+	.word	str_const4
+	.word	str_const3
 class_objTab:
 	.word	Object_protObj
 	.word	Object_init
-	.word	IO_protObj
-	.word	IO_init
-	.word	Int_protObj
-	.word	Int_init
-	.word	Bool_protObj
-	.word	Bool_init
-	.word	String_protObj
-	.word	String_init
 	.word	Main_protObj
 	.word	Main_init
 	.word	A_protObj
 	.word	A_init
 	.word	B_protObj
 	.word	B_init
+	.word	String_protObj
+	.word	String_init
+	.word	Bool_protObj
+	.word	Bool_init
+	.word	Int_protObj
+	.word	Int_init
+	.word	IO_protObj
+	.word	IO_init
 _max_tag:
 	.word	7
 class_parentTab:
 	.word	-2
 	.word	0
-	.word	0
-	.word	0
-	.word	0
-	.word	0
 	.word	5
 	.word	6
+	.word	0
+	.word	0
+	.word	0
+	.word	0
 class_attrTabTab:
 	.word	Object_attrTab
-	.word	IO_attrTab
-	.word	Int_attrTab
-	.word	Bool_attrTab
-	.word	String_attrTab
 	.word	Main_attrTab
 	.word	A_attrTab
 	.word	B_attrTab
+	.word	String_attrTab
+	.word	Bool_attrTab
+	.word	Int_attrTab
+	.word	IO_attrTab
 Object_attrTab:
 Main_attrTab:
 	.word	2

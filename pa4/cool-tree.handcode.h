@@ -79,15 +79,15 @@ typedef Cases_class *Cases;
   void dump_with_types(ostream&,int);
 
 #define Case_EXTRAS							\
-  virtual void code(ostream&) = 0;					\
+  virtual void code(ostream&, Class_) = 0;					\
   virtual void dump_with_types(ostream& ,int) = 0;
 
 #define branch_EXTRAS						\
-  void code(ostream&);						\
+  void code(ostream&, Class_);						\
   void dump_with_types(ostream& ,int);
 
 #define Expression_EXTRAS					   \
-  virtual void code(ostream&) = 0;				   \
+  virtual void code(ostream&, Class_) = 0;				   \
   Symbol type;							   \
   Symbol get_type() { return type; }				   \
   Expression set_type(Symbol s) { type = s; return this; }	   \
@@ -96,7 +96,7 @@ typedef Cases_class *Cases;
   Expression_class() { type = (Symbol) NULL; }
 
 #define Expression_SHARED_EXTRAS				\
-  void code(ostream&);						\
+  void code(ostream&, Class_);						\
   void dump_with_types(ostream&,int);
 
 

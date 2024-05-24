@@ -52,7 +52,7 @@ class Feature_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
-   virtual void code(ostream&) = 0;
+   virtual void code(ostream&, Class_ c) = 0;
    virtual bool isMethod() = 0;
    virtual Symbol getName() = 0;
    virtual Symbol get_type_decl() = 0;
@@ -197,7 +197,7 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
-   void code(ostream& stream);
+   void code(ostream& stream, Class_ c);
    bool isMethod() { return true; };
    Symbol getName() { return name; }
    Symbol get_type_decl() { return return_type; }
@@ -225,7 +225,7 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
-   void code(ostream& stream);
+   void code(ostream& stream, Class_ c);
    bool isMethod() { return false; };
    Symbol getName() { return name; }
    Symbol get_type_decl() { return type_decl; }

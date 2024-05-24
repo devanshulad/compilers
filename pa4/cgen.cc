@@ -117,8 +117,14 @@ static const char *gc_collect_names[] =
 BoolConst falsebool(FALSE);
 BoolConst truebool(TRUE);
 
+struct funcNameHolder {
+  Symbol className;
+  Symbol funcName;
+};
+
 std::map<Symbol, std::vector<Symbol>> parent_map;
 std::map<Symbol, int> class_to_tag;
+std::map<Symbol, std::vector<funcNameHolder>> func_to_offset;
 int tag_counter = 5;
 int label_count = 0;
 //*********************************************************
@@ -958,6 +964,16 @@ void CgenClassTable::code()
     if (cgen_debug) std::cerr << "making dispatch tables" << std::endl;
     make_dispatch_tables(str);
 
+    // for (auto& map_elem: func_to_offset)
+    // {
+    //   Symbol className = map_elem.first;
+    //   cout << "class_name: " << className << "\t";
+    //   for (auto& elem: map_elem.second) {
+    //     cout << "func_name: " << elem.funcName << " className: " << elem.className << endl;
+    //   }
+
+    // }
+    
     if (cgen_debug) std::cerr << "making proto tables" << std::endl;
     make_protos();
 
@@ -1123,7 +1139,7 @@ void CgenNode::class_init_func(ostream& str) {
     str << JAL << parent << "_init" << endl;
     for (int i = features->first(); features->more(i); i = features->next(i)) {
       if (!features->nth(i)->isMethod() && name != Str && name != Int && name != Bool && name != IO) {
-        features->nth(i)->code(str);
+        features->nth(i)->code(str, this);
         emit_store(ACC, offset, SELF, str);
         offset++;
       }
@@ -1148,7 +1164,7 @@ void CgenClassTable::all_funcs() {
         if (nd->get_features()->nth(i)->isMethod()) {
           // emit code for method 
           str << nd->getName() << "." << nd->get_features()->nth(i)->getName() << LABEL;
-          nd->get_features()->nth(i)->code(str);
+          nd->get_features()->nth(i)->code(str, nd);
           // str << "\t--------" << endl;
         }
       }
@@ -1162,14 +1178,18 @@ void CgenClassTable::recursive_gen_code() {
   }
 }  
 
-void CgenNode::make_dispatch(ostream& s) {
+void CgenNode::make_dispatch(ostream& s, Symbol class_name) {
   // recursion
   if (name != Object) {
-    parentnd->make_dispatch(s);
+    parentnd->make_dispatch(s, class_name);
   }
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (features->nth(i)->isMethod()) {
       s << WORD << name << "." << features->nth(i)->getName() << endl;
+      funcNameHolder curr_func;
+      curr_func.className = name;
+      curr_func.funcName = features->nth(i)->getName();
+      func_to_offset[class_name].push_back(curr_func);   
     }
   }
 }
@@ -1177,7 +1197,7 @@ void CgenNode::make_dispatch(ostream& s) {
 void CgenClassTable::make_dispatch_tables(ostream& s) {
   for (auto nd: nds) {
     s << nd->get_name() << "_dispTab" << LABEL;
-    nd->make_dispatch(s);
+    nd->make_dispatch(s, nd->get_name());
   }
 }
 
@@ -1222,32 +1242,32 @@ void class__class::code(ostream &s) {
   // s << "reached a class " << name << endl;
   // cerr << "reached a class" << endl;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
-    features->nth(i)->code(s);
+    features->nth(i)->code(s, this);
   
   }
   
 }
 
-void method_class::code(ostream &s) {
+void method_class::code(ostream &s, Class_ c) {
   // s << "reached a method " << name << endl;
   
   emit_func_start(s);
-  expr->code(s);
+  expr->code(s, c);
   emit_func_end(s);
 }
 
-void attr_class::code (ostream &s) {
+void attr_class::code (ostream &s, Class_ c) {
   // s << "reached an attribute " << name << endl;
-  init->code(s);
+  init->code(s, c);
 }
 
-void branch_class::code(ostream &s) {
+void branch_class::code(ostream &s, Class_ c) {
 }
 
-void assign_class::code(ostream &s) {
+void assign_class::code(ostream &s, Class_ c) {
 }
 
-void static_dispatch_class::code(ostream &s) {
+void static_dispatch_class::code(ostream &s, Class_ c) {
   // cerr << "static dispatch" << endl;
 }
 
@@ -1265,120 +1285,234 @@ label0:
 	lw	$t1 16($t1)
 	jalr		$t1
 */
-void dispatch_class::code(ostream &s) {
-  // cerr << "dynamic dispatch " << endl;xs
-  // assume we are only working on out_int right now:
 
+int find_func(Symbol className, Symbol func_name) {
+  std::vector<funcNameHolder> funcs = func_to_offset[className];
+  for (int i = funcs.size() - 1; i >= 0; i--) {
+    funcNameHolder func = funcs[i];
+    if (func.funcName == func_name) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void dispatch_class::code(ostream &s, Class_ c) {
   /*
    Expression expr;
    Symbol name;
    Expressions actual;
-
    Expressions is list<Expression>
   */
-  // cerr << expr << " is expr" << std::endl;
-  if (expr != NULL) {
-    for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
-      actual->nth(i)->code(s);
-      emit_push(ACC, s);
-    }
-    // emit_load_int(ACC, inttable.lookup_string("50"), s);
-    // emit_store(ACC, 0, SP, s);
-    // emit_addiu(SP, SP, -4, s);
-    // COME BACK AND CHECK
-    emit_move(ACC, SELF, s); // which should be expr->code(s);
-    // expr->code(s);
+  Symbol expr_type = expr->get_type();
+  if (expr_type == SELF_TYPE) {
+    expr_type = c->get_name();
+  }
 
-    emit_bne(ACC, ZERO, label_count, s);
-    emit_load_string(ACC, stringtable.lookup_string("pa4-easy.cl"), s);
-    emit_load_imm(T1, 3, s);
-    emit_jal("_dispatch_abort", s);
-    emit_label_ref(label_count, s);
-    s << LABEL;
-    emit_load(T1, 2, ACC, s);
-    emit_load(T1, 4, T1, s);
-    emit_jalr(T1, s);
-    label_count++;
+
+  for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+    actual->nth(i)->code(s, c);
+    emit_push(ACC, s);
+  }
+  // revisit this if things stop working in dispatch
+  // make sure c is okay to pass into even if expr is self type
+  expr->code(s, c);
+
+  emit_bne(ACC, ZERO, label_count, s);
+  emit_load_string(ACC, stringtable.lookup_string("pa4-easy.cl"), s);
+  emit_load_imm(T1, this->get_line_number(), s);
+  emit_jal("_dispatch_abort", s);
+  emit_label_ref(label_count, s);
+  s << LABEL;
+  emit_load(T1, 2, ACC, s);
+  int func_offset = find_func(expr_type, name);
+  // std::cerr << func_offset << std::endl;
+  emit_load(T1, func_offset, T1, s);
+  emit_jalr(T1, s);
+  label_count++;
+}
+
+void cond_class::code(ostream &s, Class_ c) {
+  pred->code(s, c);
+  int label_else = label_count++;
+  int label_end = label_count++;
+  emit_fetch_int(ACC, ACC, s);
+  emit_beq(ACC, ZERO, label_else, s);
+  then_exp->code(s, c);
+  emit_branch(label_end, s);
+  emit_label_ref(label_else, s);
+  s << LABEL;
+  else_exp->code(s, c);
+  emit_label_ref(label_end, s);
+  s << LABEL;
+}
+
+void loop_class::code(ostream &s, Class_ c) {
+  int label_cond = label_count++;
+  int label_end = label_count++;
+  emit_label_ref(label_cond, s);
+  s << LABEL;
+  pred->code(s, c);
+  emit_fetch_int(ACC, ACC, s);
+  emit_beq(ACC, ZERO, label_end, s);
+  body->code(s, c);
+  emit_branch(label_cond, s);
+  emit_label_ref(label_end, s);
+  s << LABEL;
+}
+
+void typcase_class::code(ostream &s, Class_ c) {
+}
+
+void block_class::code(ostream &s, Class_ c) {
+  for (int i = body->first(); body->more(i); i = body->next(i)) {
+    body->nth(i)->code(s, c);
   }
 }
 
-void cond_class::code(ostream &s) {
+void let_class::code(ostream &s, Class_ c) {
 }
 
-void loop_class::code(ostream &s) {
-}
-
-void typcase_class::code(ostream &s) {
-}
-
-void block_class::code(ostream &s) {
-}
-
-void let_class::code(ostream &s) {
-}
-
-void plus_class::code(ostream &s) {
-  e1->code(s);
+void plus_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
   emit_push(ACC, s);
-  e2->code(s);
+  e2->code(s, c);
+  emit_jal("Object.copy", s);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, ACC, s);
+  emit_add(T2, T2, T1, s);
+  emit_store_int(T2, ACC, s);
+}
+
+void sub_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_push(ACC, s);
+  e2->code(s, c);
+  emit_jal("Object.copy", s);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, ACC, s);
+  emit_sub(T1, T1, T2, s);
+  emit_store_int(T1, ACC, s);
+}
+
+void mul_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_push(ACC, s);
+  e2->code(s, c);
+  emit_jal("Object.copy", s);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, ACC, s);
+  emit_mul(T2, T2, T1, s);
+  emit_store_int(T2, ACC, s);
+}
+
+void divide_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_push(ACC, s);
+  e2->code(s, c);
+  emit_jal("Object.copy", s);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, ACC, s);
+  emit_div(T1, T1, T2, s);
+  emit_store_int(T1, ACC, s);
+}
+
+void neg_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_jal("Object.copy", s);
+  emit_fetch_int(T1, ACC, s);
+  emit_neg(T1, T1, s);
+  emit_store_int(T1, ACC, s);
+}
+
+void lt_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_push(ACC, s);
+  e2->code(s, c);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, ACC, s);
+  int label_less_than = label_count++;
+  int label_done = label_count++;
+  emit_blt(T1, T2, label_less_than, s);
+  emit_load_bool(ACC, falsebool, s);
+  emit_branch(label_done, s); 
+  emit_label_ref(label_less_than, s);
+  s << LABEL;
+  emit_load_bool(ACC, truebool, s);
+  emit_label_ref(label_done, s);
+  s << LABEL;
+}
+
+void eq_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_push(ACC, s);
+  e2->code(s, c);
   emit_pop(T1, s);
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(ACC, ACC, s);
-  emit_add(ACC, ACC, T1, s);
-  emit_store_int(ACC, ACC, s);
+  int label_equal = label_count++;
+  int label_done = label_count++;
+  emit_beq(T1, ACC, label_equal, s);
+  emit_load_bool(ACC, falsebool, s);
+  emit_branch(label_done, s);
+  emit_label_ref(label_equal, s);
+  s << LABEL;
+  emit_load_bool(ACC, truebool, s);
+  emit_label_ref(label_done, s);
+  s << LABEL;
 }
 
-void sub_class::code(ostream &s) {
+void leq_class::code(ostream &s, Class_ c) {
+  e1->code(s, c);
+  emit_push(ACC, s);
+  e2->code(s, c);
+  emit_pop(T1, s);
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(ACC, ACC, s);
+  int label_lequal = label_count++;
+  int label_done = label_count++;
+  emit_bleq(T1, ACC, label_lequal, s);
+  emit_load_bool(ACC, falsebool, s);
+  emit_branch(label_done, s);
+  emit_label_ref(label_lequal, s);
+  s << LABEL;
+  emit_load_bool(ACC, truebool, s);
+  emit_label_ref(label_done, s);
+  s << LABEL;
 }
 
-void mul_class::code(ostream &s) {
+void comp_class::code(ostream &s, Class_ c) {
 }
 
-void divide_class::code(ostream &s) {
-}
-
-void neg_class::code(ostream &s) {
-}
-
-void lt_class::code(ostream &s) {
-}
-
-void eq_class::code(ostream &s) {
-}
-
-void leq_class::code(ostream &s) {
-}
-
-void comp_class::code(ostream &s) {
-}
-
-void int_const_class::code(ostream& s)
+void int_const_class::code(ostream& s, Class_ c)
 {
-  //
-  // Need to be sure we have an IntEntry *, not an arbitrary Symbol
-  //
-  emit_load_int(ACC,inttable.lookup_string(token->get_string()),s);
+  emit_load_int(ACC, inttable.lookup_string(token->get_string()), s);
 }
 
-void string_const_class::code(ostream& s)
+void string_const_class::code(ostream& s, Class_ c)
 {
-  emit_load_string(ACC,stringtable.lookup_string(token->get_string()),s);
+  emit_load_string(ACC, stringtable.lookup_string(token->get_string()), s);
 }
 
-void bool_const_class::code(ostream& s)
+void bool_const_class::code(ostream& s, Class_ c)
 {
   emit_load_bool(ACC, BoolConst(val), s);
 }
 
-void new__class::code(ostream &s) {
+void new__class::code(ostream &s, Class_ c) {
 }
 
-void isvoid_class::code(ostream &s) {
+void isvoid_class::code(ostream &s, Class_ c) {
 }
 
-void no_expr_class::code(ostream &s) {
+void no_expr_class::code(ostream &s, Class_ c) {
 }
 
-void object_class::code(ostream &s) {
+void object_class::code(ostream &s, Class_ c) {
+  emit_move(ACC, SELF, s);
 }
-
