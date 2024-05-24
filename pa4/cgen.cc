@@ -152,6 +152,42 @@ void program_class::cgen(ostream &os) {
    CgenClassTable *codegen_classtable = new CgenClassTable(classes,os);
 }
 
+static int getParamOffset(Class_ c, Feature_class*m, Symbol name) {
+  if (class_to_func_to_param_off.find(c->getName()) == 
+      class_to_func_to_param_off.end()) {
+    cerr << "Class " << c->getName() << " not in class_to_func_to_param_off map" << endl;
+    return -1;
+  }
+  if (class_to_func_to_param_off[c->getName()].find(m->getName()) == 
+      class_to_func_to_param_off[c->getName()].end()) {
+    return -1;
+  }
+  std::vector<Symbol> params = class_to_func_to_param_off[c->getName()][m->getName()];
+  int offset = params.size() - 1;
+  for (auto elem: params) {
+    if (elem == name)
+      return offset;
+    offset--;
+  }
+  return -1;
+}
+
+static int getAttrOffset(Class_ c, Symbol name) {
+  if (class_to_attr_off.find(c->getName()) == 
+      class_to_attr_off.end()) {
+    cerr << "Class " << c->getName() << " not in class_to_func_to_param_off map" << endl;
+    return -1;
+  }
+  std::vector<Symbol> attributes = class_to_attr_off[c->getName()];
+  int offset = 0;
+  for (auto elem: attributes) {
+    if (elem == name)
+      return offset;
+    offset++;
+  }
+  return -1;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 //  emit_* procedures
@@ -1074,14 +1110,15 @@ void CgenNode::make_attr(ostream& s, bool isFirst) {
     return;
   }
   if (name == Str) {
-    s << WORD << "2" << endl;
+    s << WORD << class_to_tag[Int] << endl;
     s << WORD << "-2" << endl;
     return; 
   }
   parentnd->make_attr(s, false);
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (!features->nth(i)->isMethod()) {
-      s << WORD << "2" << endl;
+      int tagNum = class_to_tag[features->nth(i)->get_type_decl()];
+      s << WORD << tagNum << endl;
     }
   }
 }
@@ -1118,15 +1155,15 @@ void CgenNode::class_init_func(ostream& str) {
   
   int par_attributes = parentnd->get_num_parents_attr();
   // cerr << "parent of " << name << " have " << par_attributes << " many attributes." << endl;
-  int offset = 3 + par_attributes;
+  int offset = par_attributes;
   // cerr << "parent of " << name << " is " << parentnd->name << endl;
   // int offset = 3;
   if (name != Object) {
     str << JAL << parent << "_init" << endl;
     for (int i = features->first(); features->more(i); i = features->next(i)) {
       if (!features->nth(i)->isMethod() && name != Str && name != Int && name != Bool && name != IO) {
-        features->nth(i)->code(str, this);
-        emit_store(ACC, offset, SELF, str);
+        features->nth(i)->attrInit(str, this, offset);
+        // emit_store(ACC, 3 + offset, SELF, str);
         offset++;
       }
     }
@@ -1147,14 +1184,15 @@ void CgenClassTable::all_funcs() {
   for (auto nd: nds) {
     if (nd->getName() != Object && nd->getName() != Int && nd->getName() != Str && nd->getName() != Bool && nd->getName() != IO){
       // emit code for each method in the class (not inherited methods..
-      for (int i = nd->get_features()->first(); nd->get_features()->more(i); i = nd->get_features()->next(i)) {
-        if (nd->get_features()->nth(i)->isMethod()) {
-          // emit code for method 
-          str << nd->getName() << "." << nd->get_features()->nth(i)->getName() << LABEL;
-          nd->get_features()->nth(i)->code(str, nd);
-          // str << "\t--------" << endl;
-        }
-      }
+      nd->code(str);
+      // for (int i = nd->get_features()->first(); nd->get_features()->more(i); i = nd->get_features()->next(i)) {
+      //   if (nd->get_features()->nth(i)->isMethod()) {
+      //     // emit code for method 
+      //     str << nd->getName() << "." << nd->get_features()->nth(i)->getName() << LABEL;
+      //     nd->get_features()->nth(i)->code(str, nd, 0);
+      //     // str << "\t--------" << endl;
+      //   }
+      // }
     }
   }
 }
@@ -1240,13 +1278,13 @@ void CgenClassTable::make_dispatch_tables(ostream& s) {
     nd->create_class_to_attribute(s, nd->get_name());
   }
 
-  for (auto& classFunc: class_to_attr_off) {
-    cerr << "className is " << classFunc.first << "\n";
-    for (auto elem: classFunc.second) {
-      cerr << elem << " ";
-    }
-    cerr << "\n";
-  }
+  // for (auto& classFunc: class_to_attr_off) {
+  //   cerr << "className is " << classFunc.first << "\n";
+  //   for (auto elem: classFunc.second) {
+  //     cerr << elem << " ";
+  //   }
+  //   cerr << "\n";
+  // }
 }
 
 
@@ -1288,15 +1326,22 @@ CgenNode::CgenNode(Class_ nd,Basicness bstatus, CgenClassTableP ct) :
 
 void class__class::code(ostream &s) {
   // s << "reached a class " << name << endl;
-  // cerr << "reached a class" << endl;
+  cerr << "reached a class" << endl;
+  int attr_ctr = 0;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
-    features->nth(i)->code(s, this);
-  
+    if (!features->nth(i)->isMethod()) {
+      // features->nth(i)->code(s, this, attr_ctr); 
+      // attr_ctr++; 
+      continue;
+    } else {
+      s << name << "." << features->nth(i)->getName() << LABEL;
+      features->nth(i)->code(s, this, 0); 
+    }
   }
   
 }
 
-void method_class::code(ostream &s, Class_ c) {
+void method_class::code(ostream &s, Class_ c, int attr_ctr) {
   // s << "reached a method " << name << endl;
   
   emit_func_start(s);
@@ -1309,35 +1354,67 @@ void method_class::code(ostream &s, Class_ c) {
   s << RET << endl;
 }
 
-void attr_class::code (ostream &s, Class_ c) {
-  // s << "reached an attribute " << name << endl;
+void method_class::attrInit (ostream& s, Class_ c, int attr_ctr) {
+
+}
+
+void attr_class::attrInit (ostream& s, Class_ c, int attr_ctr) {
+  if (init->isNoExpr()) {
+    cerr << "init is null" << endl;
+    s << WORD;
+    if (get_type_decl() == Int) {
+      inttable.lookup_string("0")->code_ref(s);
+    } else if (get_type_decl() == Str) {
+      stringtable.lookup_string("")->code_ref(s);
+    } else if (get_type_decl() == Bool) {
+      falsebool.code_ref(s);
+    } else {
+      s << "0";
+    }
+    s << endl; // check this 
+    emit_store(ACC, DEFAULT_OBJFIELDS + attr_ctr, SELF, s);
+    return;
+  }
+  
   init->code(s, c, NULL);
+  cerr << "reaching point 0" << endl;
+
+  emit_store(ACC, DEFAULT_OBJFIELDS + attr_ctr, SELF, s);
+}
+
+void attr_class::code (ostream &s, Class_ c, int attr_ctr) {
+  cerr << "IN ATTR CLASS CODE" << endl;
 }
 
 void branch_class::code(ostream &s, Class_ c, Feature_class* m) {
 }
 
 void assign_class::code(ostream &s, Class_ c, Feature_class* m) {
+  cerr << "reaching point 1" << endl;
+
+  expr->code(s, c, m);
+  cerr << "reaching assign code" << endl;
+
+  int attrOffset = getAttrOffset(c, name);
+
+  // want to check inside method first, then param, then attributes
+  // insert check for inside method first
+  if (m != NULL) {
+    int paramOffset = getParamOffset(c, m, name);
+    if (paramOffset != -1) {
+      emit_store(ACC, paramOffset, FP, s);
+      return;
+    }
+  }
+  if (attrOffset != -1) {
+    cerr << "reaching assign attrOffset" << endl;
+    emit_store(ACC, DEFAULT_OBJFIELDS + attrOffset, SELF, s);
+  }
 }
 
 void static_dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   // cerr << "static dispatch" << endl;
 }
-
-/* 	
-  la	$a0 int_const0
-	sw	$a0 0($sp)
-	addiu	$sp $sp -4
-	move	$a0 $s0
-	bne	$a0 $zero label0
-	la	$a0 str_const0
-	li	$t1 3
-	jal	_dispatch_abort
-label0:
-	lw	$t1 8($a0)
-	lw	$t1 16($t1)
-	jalr		$t1
-*/
 
 int find_func(Symbol className, Symbol func_name) {
   std::vector<funcNameHolder> funcs = func_to_offset[className];
@@ -1372,7 +1449,8 @@ void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   expr->code(s, c, m);
 
   emit_bne(ACC, ZERO, label_count, s);
-  emit_load_string(ACC, stringtable.lookup_string("pa4-easy.cl"), s);
+  s << LA << ACC << " str_const0" << endl; 
+  // emit_load_string(ACC, stringtable.lookup_string("pa4-easy.cl"), s);
   emit_load_imm(T1, this->get_line_number(), s);
   emit_jal("_dispatch_abort", s);
   emit_label_ref(label_count, s);
@@ -1506,18 +1584,27 @@ void eq_class::code(ostream &s, Class_ c, Feature_class* m) {
   emit_push(ACC, s);
   e2->code(s, c, m);
   emit_pop(T1, s);
-  emit_fetch_int(T1, T1, s);
-  emit_fetch_int(ACC, ACC, s);
+
+  // cant do these two line, might not be int
+  // emit_fetch_int(T1, T1, s);
+  // emit_fetch_int(ACC, ACC, s);
   int label_equal = label_count++;
   int label_done = label_count++;
-  emit_beq(T1, ACC, label_equal, s);
-  emit_load_bool(ACC, falsebool, s);
-  emit_branch(label_done, s);
-  emit_label_ref(label_equal, s);
-  s << LABEL;
-  emit_load_bool(ACC, truebool, s);
-  emit_label_ref(label_done, s);
-  s << LABEL;
+  emit_move(T2, ACC, s);
+  if (e1->get_type() == Int || e1->get_type() == Str, e1->get_type() == Bool) {
+    emit_load_bool(ACC, truebool, s);
+    emit_load_bool(A1, falsebool, s);
+    emit_jal("equality_test", s);
+  } else {
+    emit_beq(T1, T2, label_equal, s);
+    emit_load_bool(ACC, falsebool, s);
+    emit_branch(label_done, s);
+    emit_label_ref(label_equal, s);
+    s << LABEL;
+    emit_load_bool(ACC, truebool, s);
+    emit_label_ref(label_done, s);
+    s << LABEL;
+  }
 }
 
 void leq_class::code(ostream &s, Class_ c, Feature_class* m) {
@@ -1540,6 +1627,18 @@ void leq_class::code(ostream &s, Class_ c, Feature_class* m) {
 }
 
 void comp_class::code(ostream &s, Class_ c, Feature_class* m) {
+  e1->code(s, c, m);
+  emit_fetch_int(T1, ACC, s);
+  int label_lequal = label_count++;
+  int label_done = label_count++;
+  emit_beq(T1, ZERO, label_lequal, s);
+  emit_load_bool(ACC, falsebool, s);
+  emit_branch(label_done, s);
+  emit_label_ref(label_lequal, s);
+  s << LABEL;
+  emit_load_bool(ACC, truebool, s);
+  emit_label_ref(label_done, s);
+  s << LABEL;
 }
 
 void int_const_class::code(ostream& s, Class_ c, Feature_class* m)
@@ -1564,42 +1663,6 @@ void isvoid_class::code(ostream &s, Class_ c, Feature_class* m) {
 }
 
 void no_expr_class::code(ostream &s, Class_ c, Feature_class* m) {
-}
-
-static int getParamOffset(Class_ c, Feature_class*m, Symbol name) {
-  if (class_to_func_to_param_off.find(c->getName()) == 
-      class_to_func_to_param_off.end()) {
-    cerr << "Class " << c->getName() << " not in class_to_func_to_param_off map" << endl;
-    return -1;
-  }
-  if (class_to_func_to_param_off[c->getName()].find(m->getName()) == 
-      class_to_func_to_param_off[c->getName()].end()) {
-    return -1;
-  }
-  std::vector<Symbol> params = class_to_func_to_param_off[c->getName()][m->getName()];
-  int offset = params.size() - 1;
-  for (auto elem: params) {
-    if (elem == name)
-      return offset;
-    offset--;
-  }
-  return -1;
-}
-
-static int getAttrOffset(Class_ c, Symbol name) {
-  if (class_to_attr_off.find(c->getName()) == 
-      class_to_attr_off.end()) {
-    cerr << "Class " << c->getName() << " not in class_to_func_to_param_off map" << endl;
-    return -1;
-  }
-  std::vector<Symbol> attributes = class_to_attr_off[c->getName()];
-  int offset = 0;
-  for (auto elem: attributes) {
-    if (elem == name)
-      return offset;
-    offset++;
-  }
-  return -1;
 }
 
 void object_class::code(ostream &s, Class_ c, Feature_class* m) {
