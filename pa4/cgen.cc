@@ -127,6 +127,7 @@ std::map<Symbol, int> class_to_tag;
 std::map<Symbol, std::vector<funcNameHolder>> func_to_offset;
 std::map<Symbol, std::map<Symbol, std::vector<Symbol>>> class_to_func_to_param_off;
 std::map<Symbol, std::vector<Symbol>> class_to_attr_off;
+std::map<Symbol, std::vector<Symbol>> identifiers;
 
 int tag_counter = 5;
 int label_count = 0;
@@ -1024,8 +1025,6 @@ void CgenClassTable::code()
     //                   - etc...
     all_object_inits();
     all_funcs();
-
-    // recursive_gen_code();
 }
 
 int CgenNode::get_num_parents_attr() {
@@ -1034,7 +1033,6 @@ int CgenNode::get_num_parents_attr() {
   // cerr << curr << endl;
   CgenNode* curr_node = this;
   while (curr != Object && curr != No_class) {
-    // num_parents_attr += class_->get_features()->len();
     for (int i = curr_node->features->first(); curr_node->features->more(i); i = curr_node->features->next(i)) {
       if (!curr_node->features->nth(i)->isMethod()) {
         num_parents_attr++;
@@ -1168,7 +1166,6 @@ void CgenNode::class_init_func(ostream& str) {
       }
     }
   }
-  
   emit_move(ACC, SELF, str);
   emit_func_end(str);
   str << RET << endl;
@@ -1197,11 +1194,6 @@ void CgenClassTable::all_funcs() {
   }
 }
 
-void CgenClassTable::recursive_gen_code() {
-  for (auto nd: nds) {
-    static_cast<Class_>(nd)->code(str);
-  }
-}  
 
 void CgenNode::make_dispatch(ostream& s, Symbol class_name) {
   // recursion
@@ -1324,14 +1316,26 @@ CgenNode::CgenNode(Class_ nd,Basicness bstatus, CgenClassTableP ct) :
 //
 //*****************************************************************
 
+int getStackOffset(Class_ c, Symbol let_name) {
+  std::vector<Symbol> vars = identifiers[c->getName()];
+  int offset = 0;
+  for (int i = vars.size() - 1; i >= 0; i--) {
+    Symbol curr_name = vars[i];
+    if (curr_name == let_name) {
+      cerr << "IN GET STACK OFFSET RETURNING " << offset << endl;
+      return offset;
+    }
+    offset++;
+  }
+  cerr << "IN GET STACK OFFSET RETURNING -1" << endl;
+  return -1;
+}
+
 void class__class::code(ostream &s) {
-  // s << "reached a class " << name << endl;
   cerr << "reached a class" << endl;
   int attr_ctr = 0;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (!features->nth(i)->isMethod()) {
-      // features->nth(i)->code(s, this, attr_ctr); 
-      // attr_ctr++; 
       continue;
     } else {
       s << name << "." << features->nth(i)->getName() << LABEL;
@@ -1350,6 +1354,7 @@ void method_class::code(ostream &s, Class_ c, int attr_ctr) {
   Formals params = getFormals();
   for (int i = params->first(); params->more(i); i = params->next(i)) {
     emit_addiu(SP,SP,4,s);
+    identifiers[c->getName()].pop_back();
   }
   s << RET << endl;
 }
@@ -1396,9 +1401,13 @@ void assign_class::code(ostream &s, Class_ c, Feature_class* m) {
   cerr << "reaching assign code" << endl;
 
   int attrOffset = getAttrOffset(c, name);
+  int stackOffset = getStackOffset(c, name);
 
   // want to check inside method first, then param, then attributes
   // insert check for inside method first
+  if (stackOffset != -1) {
+    emit_load(ACC, stackOffset + 1, SP, s); // + 1 for moving past SP
+  }
   if (m != NULL) {
     int paramOffset = getParamOffset(c, m, name);
     if (paramOffset != -1) {
@@ -1428,12 +1437,6 @@ int find_func(Symbol className, Symbol func_name) {
 }
 
 void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
-  /*
-   Expression expr;
-   Symbol name;
-   Expressions actual;
-   Expressions is list<Expression>
-  */
   Symbol expr_type = expr->get_type();
   if (expr_type == SELF_TYPE) {
     expr_type = c->get_name();
@@ -1443,6 +1446,7 @@ void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
     actual->nth(i)->code(s, c, m);
     emit_push(ACC, s);
+    identifiers[c->getName()].push_back(Symbol(""));
   }
   // revisit this if things stop working in dispatch
   // make sure c is okay to pass into even if expr is self type
@@ -1457,7 +1461,6 @@ void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   s << LABEL;
   emit_load(T1, 2, ACC, s);
   int func_offset = find_func(expr_type, name);
-  // std::cerr << func_offset << std::endl;
   emit_load(T1, func_offset, T1, s);
   emit_jalr(T1, s);
   label_count++;
@@ -1502,14 +1505,35 @@ void block_class::code(ostream &s, Class_ c, Feature_class* m) {
 }
 
 void let_class::code(ostream &s, Class_ c, Feature_class* m) {
+
+  init->code(s, c, m);
+
+  if (init->isNoExpr()) {
+    // defaultif (get_type_decl() == Int) {
+    if (type_decl == Int) {
+      emit_load_int(ACC, inttable.lookup_string("0"), s);
+    } else if (type_decl == Str) {
+      emit_load_string(ACC, stringtable.lookup_string(""), s);
+    } else if (type_decl == Bool) {
+      emit_load_bool(ACC, falsebool, s);
+    } 
+  }
+  // identifiers
+  identifiers[c->getName()].push_back(identifier);
+  emit_push(ACC, s);
+  body->code(s, c, m);
+  emit_addiu(SP, SP, 4, s);
+  identifiers[c->getName()].pop_back();
 }
 
 void plus_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_jal("Object.copy", s);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(T2, ACC, s);
   emit_add(T2, T2, T1, s);
@@ -1519,9 +1543,11 @@ void plus_class::code(ostream &s, Class_ c, Feature_class* m) {
 void sub_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_jal("Object.copy", s);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(T2, ACC, s);
   emit_sub(T1, T1, T2, s);
@@ -1531,9 +1557,11 @@ void sub_class::code(ostream &s, Class_ c, Feature_class* m) {
 void mul_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_jal("Object.copy", s);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(T2, ACC, s);
   emit_mul(T2, T2, T1, s);
@@ -1543,9 +1571,11 @@ void mul_class::code(ostream &s, Class_ c, Feature_class* m) {
 void divide_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_jal("Object.copy", s);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(T2, ACC, s);
   emit_div(T1, T1, T2, s);
@@ -1563,8 +1593,10 @@ void neg_class::code(ostream &s, Class_ c, Feature_class* m) {
 void lt_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(T2, ACC, s);
   int label_less_than = label_count++;
@@ -1582,8 +1614,11 @@ void lt_class::code(ostream &s, Class_ c, Feature_class* m) {
 void eq_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
+
 
   // cant do these two line, might not be int
   // emit_fetch_int(T1, T1, s);
@@ -1610,8 +1645,10 @@ void eq_class::code(ostream &s, Class_ c, Feature_class* m) {
 void leq_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
+  identifiers[c->getName()].push_back(Symbol(""));
   e2->code(s, c, m);
   emit_pop(T1, s);
+  identifiers[c->getName()].pop_back();
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(ACC, ACC, s);
   int label_lequal = label_count++;
@@ -1665,11 +1702,16 @@ void isvoid_class::code(ostream &s, Class_ c, Feature_class* m) {
 void no_expr_class::code(ostream &s, Class_ c, Feature_class* m) {
 }
 
+
 void object_class::code(ostream &s, Class_ c, Feature_class* m) {
   int attrOffset = getAttrOffset(c, name);
+  int stackOffset = getStackOffset(c, name);
 
   // want to check inside method first, then param, then attributes
   // insert check for inside method first
+  if (stackOffset != -1) {
+    emit_load(ACC, stackOffset + 1, SP, s); // + 1 for moving past SP
+  }
   if (m != NULL) {
     int paramOffset = getParamOffset(c, m, name);
     if (paramOffset != -1) {

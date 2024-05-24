@@ -44,7 +44,6 @@ private:
 
   // we added 
   void all_object_inits();
-  void recursive_gen_code();
   void all_funcs();
   void make_dispatch_tables(ostream& s);
   void assign_tags();
