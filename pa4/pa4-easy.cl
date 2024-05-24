@@ -2,8 +2,7 @@ class Main inherits IO {
     
     main(): Object 
     {{
-        while true loop
-        { if true then
+        if true then
             out_string("true\n")
          else
             out_string("false\n")
@@ -35,8 +34,6 @@ class Main inherits IO {
          else
             out_string("false\n")
         fi;
-        }
-        pool;
 
     }};
 };

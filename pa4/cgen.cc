@@ -1183,6 +1183,7 @@ void CgenNode::make_dispatch(ostream& s, Symbol class_name) {
   if (name != Object) {
     parentnd->make_dispatch(s, class_name);
   }
+  std::map<Symbol, std::vector<Symbol>> func_to_param_off;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (features->nth(i)->isMethod()) {
       s << WORD << name << "." << features->nth(i)->getName() << endl;
@@ -1190,8 +1191,18 @@ void CgenNode::make_dispatch(ostream& s, Symbol class_name) {
       curr_func.className = name;
       curr_func.funcName = features->nth(i)->getName();
       func_to_offset[class_name].push_back(curr_func);   
+
+      std::vector<Symbol> param_lst;
+      for (Formal param: features->nth(i)->formals) {
+        param_lst.push_back(param->getName());
+      }
+      func_to_param_off[features->nth(i)->name] = param_lst;
     }
   }
+  if (func_to_param_off.size() != 0)
+    class_to_func_to_param_off[class_name] = func_to_param_off;
+
+  
 }
 
 void CgenClassTable::make_dispatch_tables(ostream& s) {
