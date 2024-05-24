@@ -87,6 +87,8 @@ public:
   void make_attr(ostream& s, bool isFirst);
   void create_func_to_param(ostream& s, Symbol class_name);
   void rec_add_params(std::map<Symbol, std::vector<Symbol>>& func_to_param);
+  void create_class_to_attribute(ostream& s, Symbol class_name);
+  void rec_add_attributes(std::vector<Symbol>& attributes);
 };
 
 class BoolConst {
