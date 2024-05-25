@@ -1,5 +1,5 @@
 Class Main {
     main(): Object {
-        new Main
+        new SELF_TYPE
     };
 };
