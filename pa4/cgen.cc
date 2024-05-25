@@ -1322,17 +1322,17 @@ int getStackOffset(Class_ c, Symbol let_name) {
   for (int i = vars.size() - 1; i >= 0; i--) {
     Symbol curr_name = vars[i];
     if (curr_name == let_name) {
-      cerr << "IN GET STACK OFFSET RETURNING " << offset << endl;
+      cerr << "IN GET STACK OFFSET RETURNING " << offset << let_name << endl;
       return offset;
     }
     offset++;
   }
-  cerr << "IN GET STACK OFFSET RETURNING -1" << endl;
+  cerr << "IN GET STACK OFFSET RETURNING -1: " << let_name << endl;
   return -1;
 }
 
 void class__class::code(ostream &s) {
-  cerr << "reached a class" << endl;
+  // cerr << "reached a class" << endl;
   int attr_ctr = 0;
   for (int i = features->first(); features->more(i); i = features->next(i)) {
     if (!features->nth(i)->isMethod()) {
@@ -1346,7 +1346,8 @@ void class__class::code(ostream &s) {
 }
 
 void method_class::code(ostream &s, Class_ c, int attr_ctr) {
-  // s << "reached a method " << name << endl;
+  cerr << "reached a method " << name << endl;
+  identifiers[c->getName()] = std::vector<Symbol>();
   
   emit_func_start(s);
   expr->code(s, c, this);
@@ -1354,7 +1355,6 @@ void method_class::code(ostream &s, Class_ c, int attr_ctr) {
   Formals params = getFormals();
   for (int i = params->first(); params->more(i); i = params->next(i)) {
     emit_addiu(SP,SP,4,s);
-    identifiers[c->getName()].pop_back();
   }
   s << RET << endl;
 }
@@ -1382,23 +1382,22 @@ void attr_class::attrInit (ostream& s, Class_ c, int attr_ctr) {
   }
   
   init->code(s, c, NULL);
-  cerr << "reaching point 0" << endl;
 
   emit_store(ACC, DEFAULT_OBJFIELDS + attr_ctr, SELF, s);
 }
 
 void attr_class::code (ostream &s, Class_ c, int attr_ctr) {
-  cerr << "IN ATTR CLASS CODE" << endl;
+  // cerr << "IN ATTR CLASS CODE" << endl;
 }
 
 void branch_class::code(ostream &s, Class_ c, Feature_class* m) {
+  expr->code(s, c, m);
 }
 
 void assign_class::code(ostream &s, Class_ c, Feature_class* m) {
-  cerr << "reaching point 1" << endl;
+
 
   expr->code(s, c, m);
-  cerr << "reaching assign code" << endl;
 
   int attrOffset = getAttrOffset(c, name);
   int stackOffset = getStackOffset(c, name);
@@ -1406,7 +1405,8 @@ void assign_class::code(ostream &s, Class_ c, Feature_class* m) {
   // want to check inside method first, then param, then attributes
   // insert check for inside method first
   if (stackOffset != -1) {
-    emit_load(ACC, stackOffset + 1, SP, s); // + 1 for moving past SP
+    emit_store(ACC, stackOffset + 1, SP, s); // + 1 for moving past SP
+    return;
   }
   if (m != NULL) {
     int paramOffset = getParamOffset(c, m, name);
@@ -1416,13 +1416,55 @@ void assign_class::code(ostream &s, Class_ c, Feature_class* m) {
     }
   }
   if (attrOffset != -1) {
-    cerr << "reaching assign attrOffset" << endl;
+    // cerr << "reaching assign attrOffset" << endl;
     emit_store(ACC, DEFAULT_OBJFIELDS + attrOffset, SELF, s);
+    return;
   }
+}
+
+int find_func_static(Symbol className, Symbol func_name, Symbol static_type) {
+  std::vector<funcNameHolder> funcs = func_to_offset[className];
+  for (int i = funcs.size() - 1; i >= 0; i--) {
+    funcNameHolder func = funcs[i];
+    if (func.funcName == func_name && func.className == static_type) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 void static_dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   // cerr << "static dispatch" << endl;
+  Symbol expr_type = type_name;
+
+  for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+    actual->nth(i)->code(s, c, m);
+    emit_push(ACC, s);
+    identifiers[c->getName()].push_back(Symbol(""));
+    cerr << " in dispatch we are pushing GARBAGE; new size is " << identifiers[c->getName()].size()<< endl;
+  }
+  // revisit this if things stop working in dispatch
+  // make sure c is okay to pass into even if expr is self type
+  expr->code(s, c, m);
+
+  emit_bne(ACC, ZERO, label_count, s);
+  s << LA << ACC << " str_const0" << endl; 
+  // emit_load_string(ACC, stringtable.lookup_string("pa4-easy.cl"), s);
+  emit_load_imm(T1, this->get_line_number(), s);
+  emit_jal("_dispatch_abort", s);
+  emit_label_ref(label_count, s);
+  s << LABEL;
+  emit_load(T1, 2, ACC, s);
+  int func_offset = find_func_static(expr_type, name, type_name);
+  emit_load(T1, func_offset, T1, s);
+  emit_jalr(T1, s);
+  label_count++;
+
+  for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+    //emit_addiu(SP,SP,4,s);
+    identifiers[c->getName()].pop_back();
+    cerr << " popping from identifiers " << endl;
+  }
 }
 
 int find_func(Symbol className, Symbol func_name) {
@@ -1436,6 +1478,8 @@ int find_func(Symbol className, Symbol func_name) {
   return -1;
 }
 
+
+
 void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   Symbol expr_type = expr->get_type();
   if (expr_type == SELF_TYPE) {
@@ -1447,6 +1491,7 @@ void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
     actual->nth(i)->code(s, c, m);
     emit_push(ACC, s);
     identifiers[c->getName()].push_back(Symbol(""));
+    cerr << " in dispatch we are pushing GARBAGE; new size is " << identifiers[c->getName()].size()<< endl;
   }
   // revisit this if things stop working in dispatch
   // make sure c is okay to pass into even if expr is self type
@@ -1464,6 +1509,12 @@ void dispatch_class::code(ostream &s, Class_ c, Feature_class* m) {
   emit_load(T1, func_offset, T1, s);
   emit_jalr(T1, s);
   label_count++;
+
+  for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
+    //emit_addiu(SP,SP,4,s);
+    identifiers[c->getName()].pop_back();
+    cerr << " popping from identifiers " << endl;
+  }
 }
 
 void cond_class::code(ostream &s, Class_ c, Feature_class* m) {
@@ -1496,6 +1547,41 @@ void loop_class::code(ostream &s, Class_ c, Feature_class* m) {
 }
 
 void typcase_class::code(ostream &s, Class_ c, Feature_class* m) {
+  expr->code(s, c, m);
+  int label_case = label_count++;
+  int label_finish = label_count++;
+
+  emit_bne(ACC, ZERO, label_case, s);
+  s << LA << ACC << " str_const0" << endl;
+  emit_load_imm(T1, this->get_line_number(), s);
+  emit_jal("_case_abort2", s);
+
+  int curr_label = label_case;
+  for (int i = cases->first(); cases->more(i); i = cases->next(i)) {
+    emit_label_ref(curr_label, s);
+    s << LABEL;
+
+    branch_class* branch = static_cast<branch_class*>(cases->nth(i));
+    int curr_branch_tag = class_to_tag[branch->get_type_decl()];
+    if (i == 0) 
+      emit_load(T1, 0, ACC, s);
+    
+    curr_label = label_count++;
+    emit_load_imm(T2, curr_branch_tag, s);
+    emit_bne(T1, T2, curr_label, s);
+    identifiers[c->getName()].push_back(branch->get_name());
+    emit_push(ACC, s);
+    branch->code(s, c, m);
+    emit_addiu(SP, SP, 4, s);
+    identifiers[c->getName()].pop_back();
+    emit_branch(label_finish, s);
+  }
+  
+  emit_label_ref(curr_label, s);
+  s << LABEL;
+  emit_jal("_case_abort", s);
+  emit_label_ref(label_finish, s);
+  s << LABEL;
 }
 
 void block_class::code(ostream &s, Class_ c, Feature_class* m) {
@@ -1506,10 +1592,9 @@ void block_class::code(ostream &s, Class_ c, Feature_class* m) {
 
 void let_class::code(ostream &s, Class_ c, Feature_class* m) {
 
-  init->code(s, c, m);
-
   if (init->isNoExpr()) {
     // defaultif (get_type_decl() == Int) {
+    cerr << "init is null" << endl;
     if (type_decl == Int) {
       emit_load_int(ACC, inttable.lookup_string("0"), s);
     } else if (type_decl == Str) {
@@ -1517,6 +1602,9 @@ void let_class::code(ostream &s, Class_ c, Feature_class* m) {
     } else if (type_decl == Bool) {
       emit_load_bool(ACC, falsebool, s);
     } 
+  } else {
+    cerr << "generating code " << endl;
+    init->code(s, c, m);
   }
   // identifiers
   identifiers[c->getName()].push_back(identifier);
@@ -1530,10 +1618,15 @@ void plus_class::code(ostream &s, Class_ c, Feature_class* m) {
   e1->code(s, c, m);
   emit_push(ACC, s);
   identifiers[c->getName()].push_back(Symbol(""));
+  cerr << "pushing garbage in plus; new size is " << identifiers[c->getName()].size() << endl;
+  cerr << "size of lst is " << identifiers[c->getName()].size() << endl;
+
   e2->code(s, c, m);
   emit_jal("Object.copy", s);
   emit_pop(T1, s);
   identifiers[c->getName()].pop_back();
+  cerr << "popping garbage in plus; new size is " << identifiers[c->getName()].size() << endl;
+  cerr << "size of lst is " << identifiers[c->getName()].size() << endl;
   emit_fetch_int(T1, T1, s);
   emit_fetch_int(T2, ACC, s);
   emit_add(T2, T2, T1, s);
@@ -1680,6 +1773,7 @@ void comp_class::code(ostream &s, Class_ c, Feature_class* m) {
 
 void int_const_class::code(ostream& s, Class_ c, Feature_class* m)
 {
+  cerr << "in int const for " << token->get_string() << endl;
   emit_load_int(ACC, inttable.lookup_string(token->get_string()), s);
 }
 
@@ -1694,12 +1788,38 @@ void bool_const_class::code(ostream& s, Class_ c, Feature_class* m)
 }
 
 void new__class::code(ostream &s, Class_ c, Feature_class* m) {
+  // if (type_name == SELF_TYPE) {
+  //   emit_load_address(T1, "class_objTab", s);
+  //   emit_load(T2, 0, SELF, s);
+  //   emit_sll(T2, T2, 3, s);
+  //   emit_addu(T1, T1, T2, s);
+  //   emit_load(ACC, 0, T1, s);
+  //   emit_jal("Object.copy", s);
+  //   emit_load(T1, 1, T1, s);
+  //   emit_jalr(T1, s);
+  // } else {
+  //   s << LA << ACC << " " << type_name << "_protObj" << endl;
+  //   s << JAL << "Object.copy" << endl;
+  //   s << JAL << type_name << "_init" << endl;
+  // }
 }
 
 void isvoid_class::code(ostream &s, Class_ c, Feature_class* m) {
+  // e1->code(s, c, m);
+  // int label_void = label_count++;
+  // int label_done = label_count++;
+  // emit_beq(ACC, ZERO, label_void, s);
+  // emit_load_bool(ACC, falsebool, s);
+  // emit_branch(label_done, s);
+  // emit_label_ref(label_void, s);
+  // s << LABEL;
+  // emit_load_bool(ACC, truebool, s);
+  // emit_label_ref(label_done, s);
+  // s << LABEL;
 }
 
 void no_expr_class::code(ostream &s, Class_ c, Feature_class* m) {
+  // emit_move(ACC, ZERO, s);
 }
 
 
@@ -1710,7 +1830,14 @@ void object_class::code(ostream &s, Class_ c, Feature_class* m) {
   // want to check inside method first, then param, then attributes
   // insert check for inside method first
   if (stackOffset != -1) {
+    cerr << "offset is " << stackOffset << " size is " <<identifiers[c->getName()].size()  << endl;
+    // for(auto& elem: identifiers[c->getName()]) {
+    //   if (elem)
+    //     cerr << *elem << " ";
+    // }
+    cerr << endl;
     emit_load(ACC, stackOffset + 1, SP, s); // + 1 for moving past SP
+    return;
   }
   if (m != NULL) {
     int paramOffset = getParamOffset(c, m, name);
@@ -1721,6 +1848,7 @@ void object_class::code(ostream &s, Class_ c, Feature_class* m) {
   }
   if (attrOffset != -1) {
     emit_load(ACC, DEFAULT_OBJFIELDS + attrOffset, SELF, s);
+    return;
   }
   else 
     emit_move(ACC, SELF, s);

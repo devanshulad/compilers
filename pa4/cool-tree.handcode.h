@@ -84,7 +84,7 @@ typedef Cases_class *Cases;
 
 #define branch_EXTRAS						\
   void code(ostream&, Class_, Feature_class*);						\
-  void dump_with_types(ostream& ,int);
+  void dump_with_types(ostream& ,int);  
 
 #define Expression_EXTRAS					   \
   virtual void code(ostream&, Class_, Feature_class*) = 0;				   \
