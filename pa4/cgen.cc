@@ -1364,11 +1364,12 @@ void method_class::attrInit (ostream& s, Class_ c, int attr_ctr) {
 }
 
 void attr_class::attrInit (ostream& s, Class_ c, int attr_ctr) {
-  if (init->get_type() == SELF_TYPE) {
-    return;
-  } 
   if (init->isNoExpr()) {
     // cerr << "init is null" << endl;
+    if (type_decl == SELF_TYPE) {
+      return;
+    }
+     
     s << WORD;
     if (get_type_decl() == Int) {
       inttable.lookup_string("0")->code_ref(s);

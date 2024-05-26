@@ -1,8 +1,7 @@
 class Main inherits IO {
-
+    a: B <- new B;
     main() : Object {
         {
-            (*
             out_int(a.func());
             out_string("\n");
             out_int(func());
@@ -11,7 +10,6 @@ class Main inherits IO {
             out_string("\n");
             out_int(a@B.func());
             out_string("\n");
-            *)
             4;
         }
     };
@@ -49,13 +47,13 @@ class A inherits IO {
     };
 };
 
-class B {
+class B inherits A {
     c: Bool <- isvoid func(); 
     d: SELF_TYPE;
     func() : Int {
         {
-            --- d <- self;
-            ---            d.do_stuff(5, c);
+            d <- self;
+            d.do_stuff(5, c);
             if c then 31 else 41 fi;
         }
     };
